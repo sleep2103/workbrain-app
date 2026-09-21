@@ -45,6 +45,9 @@ header{display:flex;flex-direction:column;gap:6px;padding:8px 12px 10px;position
 .sync{font-size:.68rem;color:var(--faint);padding:0 4px}
 main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 14px calc(96px + env(safe-area-inset-bottom,0px))}
 main.brainmode{overflow:hidden;padding:0;pointer-events:none}
+body.space{background:radial-gradient(45% 38% at 20% 25%,rgba(70,60,190,.25),transparent 70%),radial-gradient(38% 30% at 82% 18%,rgba(150,50,160,.18),transparent 72%),radial-gradient(50% 42% at 72% 88%,rgba(20,90,150,.2),transparent 72%),#03040B!important}
+:root[data-theme="dark"]{--ink:#E9ECF6;--sub:#9CA3BA;--faint:#6B7189;--line:rgba(255,255,255,.10);--glass:rgba(16,19,34,.62);--edge:rgba(255,255,255,.09)}
+:root[data-theme="dark"] html,:root[data-theme="dark"] body{color:var(--ink)}
 #brain{position:fixed;inset:0;z-index:3;display:none;touch-action:none;-webkit-user-select:none;user-select:none}
 #brain.on{display:block}
 .bottom{position:fixed;left:0;right:0;bottom:0;z-index:15;padding:8px 12px calc(10px + env(safe-area-inset-bottom,0px));
@@ -586,6 +589,7 @@ function moreHTML(){
   return `<div class="card glass">
     <p class="say">더보기</p>
     <div class="row">
+      <button class="btn" data-act="theme">화면: ${({auto:"기기 설정 따름",light:"라이트",space:"우주"})[themePref()]}</button>
       <button class="btn" data-act="ask">AI에게 물어보기</button>
       <button class="btn" data-act="gh">기기 간 동기화${GH?" (켜짐)":""}</button>
       <button class="btn" data-act="sync">지금 동기화</button>
@@ -692,7 +696,9 @@ function bind(){
   $("view").querySelectorAll("[data-item]").forEach(c=>c.onchange=()=>toggleItem(c.dataset.item,c.checked));
   const q=$("q"); if(q) q.oninput=e=>{ filter=e.target.value; const pos=e.target.selectionStart; render(); const n=$("q"); if(n){n.focus();n.setSelectionRange(pos,pos);} };
   $("view").querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{ const a=b.dataset.act;
-    if(a==="import") importSheet(); else if(a==="export") exportData(); else if(a==="gh") ghSheet(); else if(a==="ask") askSheet(); else syncNow(false); });
+    if(a==="import") importSheet(); else if(a==="export") exportData(); else if(a==="gh") ghSheet(); else if(a==="ask") askSheet();
+    else if(a==="theme"){ const order=["auto","light","space"]; const nx=order[(order.indexOf(themePref())+1)%3]; localStorage.setItem("wb_theme",nx); applyTheme(); render(); toast(({auto:"기기 설정을 따릅니다",light:"라이트 모드",space:"우주 모드"})[nx]); }
+    else syncNow(false); });
 }
 async function toggleItem(key,on){
   const [tid,iid]=key.split("|"); const t=byId(tid); if(!t) return;
@@ -725,7 +731,31 @@ async function exportData(){
 /* ---------- 뇌(3D 그래프) ---------- */
 const B={cv:null,ctx:null,W:0,H:0,dpr:1,nodes:[],links:[],rx:-.35,ry:.6,dist:820,tdist:820,zoom:1,tzoom:1,auto:true,ptr:null,fit:0,rep:1800,len:150,sel:null};
 const SIGC={red:"#FF3B30",yellow:"#FFC400",green:"#34C759",wait:"#AEAEB2",done:"#D1D1D6"};
-const darkMode=()=>matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches;
+const themePref=()=>localStorage.getItem("wb_theme")||"auto";
+const darkMode=()=>{ const t=themePref(); return t==="space"||(t==="auto"&&matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches); };
+function applyTheme(){ document.documentElement.setAttribute("data-theme",darkMode()?"dark":"light"); document.body.classList.toggle("space",darkMode()); }
+const STARS=[]; (function(){ for(let i=0;i<340;i++){ const u=Math.random()*2-1,t=Math.random()*6.283,R=2200+Math.random()*1200;
+  STARS.push({x:R*Math.sqrt(1-u*u)*Math.cos(t),y:R*u,z:R*Math.sqrt(1-u*u)*Math.sin(t),m:Math.random(),ph:Math.random()*6.3,c:Math.random()<.12?"#FFD9B0":Math.random()<.25?"#BFD4FF":"#FFFFFF"}); } })();
+let DUST=[];
+function buildDust(){ const n=Math.min(900,120+B.nodes.length*30); if(DUST.length===n) return; DUST=[];
+  for(let i=0;i<n;i++){ const arm=(i%2)*Math.PI, rr=Math.pow(Math.random(),.6)*(220+B.nodes.length*8), sp=rr*.012+arm+(Math.random()-.5)*.9;
+    DUST.push({x:Math.cos(sp)*rr,z:Math.sin(sp)*rr,y:(Math.random()-.5)*rr*.12,a:.12+Math.random()*.35,ph:Math.random()*6.3,c:Math.random()<.7?"200,215,255":"255,220,200"}); } }
+function spaceBack(ctx,ts){
+  const cx=Math.cos(B.rx),sx=Math.sin(B.rx),cy=Math.cos(B.ry*.35),sy=Math.sin(B.ry*.35);
+  for(const st of STARS){ const x1=st.x*cy-st.z*sy,z1=st.x*sy+st.z*cy,y1=st.y*cx-z1*sx,z2=st.y*sx+z1*cx;
+    const s=820/(820+z2+2200), px=B.W/2+x1*s*1.3, py=B.H/2+y1*s*1.3; if(px<0||py<0||px>B.W||py>B.H) continue;
+    ctx.globalAlpha=(.25+st.m*.6)*(.45+.55*Math.abs(Math.sin(ts*.0009+st.ph))); ctx.fillStyle=st.c;
+    ctx.beginPath(); ctx.arc(px,py,st.m>.93?1.4:st.m>.7?1:.65,0,7); ctx.fill(); }
+  ctx.globalAlpha=1;
+  if(!B.nodes.length) return;
+  buildDust(); ctx.globalCompositeOperation="lighter";
+  for(const d of DUST){ const p=proj(d); if(p.x<-20||p.y<-20||p.x>B.W+20||p.y>B.H+20) continue;
+    ctx.fillStyle=`rgba(${d.c},${(d.a*(.6+.4*Math.sin(ts*.0006+d.ph))*Math.min(1,p.s)).toFixed(3)})`;
+    ctx.beginPath(); ctx.arc(p.x,p.y,Math.max(.5,1.1*p.s),0,7); ctx.fill(); }
+  ctx.globalCompositeOperation="source-over";
+}
+function glow(ctx,x,y,r,col,k){ const g=ctx.createRadialGradient(x,y,0,x,y,r*4); g.addColorStop(0,col+"cc"); g.addColorStop(.25,col+"55"); g.addColorStop(1,col+"00");
+  ctx.globalCompositeOperation="lighter"; const a=ctx.globalAlpha; ctx.globalAlpha=a*k; ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r*4,0,7); ctx.fill(); ctx.globalAlpha=a; ctx.globalCompositeOperation="source-over"; }
 function brainInit(){
   B.cv=$("brain"); B.ctx=B.cv.getContext("2d");
   const rs=()=>{ B.dpr=devicePixelRatio||1; B.W=innerWidth; B.H=innerHeight; B.cv.width=B.W*B.dpr; B.cv.height=B.H*B.dpr; };
@@ -819,6 +849,7 @@ function brainDraw(ts){
   B.zoom+=(B.tzoom-B.zoom)*.12;
   if(B.auto) B.ry+=0.0016;
   ctx.setTransform(B.dpr,0,0,B.dpr,0,0); ctx.clearRect(0,0,B.W,B.H);
+  if(dark) spaceBack(ctx,ts);
   const P=new Map(B.nodes.map(n=>[n,proj(n)]));
   const halo=dark?"rgba(11,11,15,.9)":"rgba(255,255,255,.92)";
   const inkC=dark?"#EDEDF2":"#1D1D1F", perC=dark?"#DCAEFF":"#6B2E91";
@@ -839,9 +870,10 @@ function brainDraw(ts){
     if(p.x<-60||p.y<-60||p.x>B.W+60||p.y>B.H+60||r<1.5) continue;
     const dep=Math.max(.25,Math.min(1,p.s*1.15));
     ctx.globalAlpha=dep;
-    if(n.type==="task"&&n.sig==="red"){ ctx.fillStyle="rgba(255,59,48,.16)";
+    if(!dark&&n.type==="task"&&n.sig==="red"){ ctx.fillStyle="rgba(255,59,48,.16)";
       ctx.beginPath(); ctx.arc(p.x,p.y,r+5+1.5*Math.sin(ts/480+n.ph),0,7); ctx.fill(); }
-    const base=n.type==="task"?(SIGC[n.sig]||"#0A84FF"):n.type==="person"?"#AF52DE":(dark?"#2C2C30":"#FFFFFF");
+    const base=n.type==="task"?(SIGC[n.sig]||"#0A84FF"):n.type==="person"?"#AF52DE":(dark?"#1A1D30":"#FFFFFF");
+    if(dark&&n.type!=="group") glow(ctx,p.x,p.y,r,n.type==="person"?"#B86BFF":base,n.sig==="red"?1.1:.8);
     const g=ctx.createRadialGradient(p.x-r*.35,p.y-r*.4,r*.15,p.x,p.y,r);
     g.addColorStop(0,"rgba(255,255,255,.55)"); g.addColorStop(.45,base); g.addColorStop(1,base);
     ctx.fillStyle=g; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,7); ctx.fill();
@@ -965,7 +997,8 @@ if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
   navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
 /* ---------- 시작 ---------- */
-loadLocal(); ready=3; syncNote(); brainInit(); render();
+loadLocal(); applyTheme(); ready=3; syncNote(); brainInit(); render();
+matchMedia&&matchMedia("(prefers-color-scheme: dark)").addEventListener&&matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{applyTheme();render();});
 if(GH){
   syncNow(true);
   setInterval(()=>syncNow(true),25000);
