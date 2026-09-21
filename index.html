@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Work Brain 모바일 v2.9.4</title>
+<title>Work Brain 모바일 v2.9.9</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -53,8 +53,24 @@ body.space{background:radial-gradient(45% 38% at 20% 25%,rgba(70,60,190,.25),tra
 :root[data-theme="dark"] html,:root[data-theme="dark"] body{color:var(--ink)}
 :root{color-scheme:light}
 :root[data-theme="dark"]{color-scheme:dark}
-:root[data-theme="dark"] select option,:root[data-theme="dark"] select optgroup{background:#161A2B;color:#E9ECF6}
-:root[data-theme="dark"] select optgroup{color:#8C93AD}
+:root[data-theme="dark"] select{
+  color-scheme:dark!important;
+  background-color:#141827!important;
+  color:#E9ECF6!important;
+  border-color:rgba(255,255,255,.12)!important;
+}
+:root[data-theme="dark"] select option{
+  background:#141827!important;
+  color:#E9ECF6!important;
+}
+:root[data-theme="dark"] select optgroup{
+  background:#0F1220!important;
+  color:#9CA3BA!important;
+}
+:root[data-theme="dark"] select option:checked{
+  background:#0A84FF!important;
+  color:#FFFFFF!important;
+}
 #brain{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:3;display:none;touch-action:none;-webkit-user-select:none;user-select:none}
 #brain.on{display:block}
 .bottom{position:fixed;left:0;right:0;bottom:0;z-index:15;padding:8px 12px calc(10px + env(safe-area-inset-bottom,0px));
@@ -124,7 +140,7 @@ details.rec[open] .rsum{display:none}
 </head>
 <body>
 <header class="glass">
-  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v2.9.4</span></span><span class="sync" id="sync">연결 중…</span></div>
+  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v2.9.9</span></span><span class="sync" id="sync">연결 중…</span></div>
   <div class="hbtns" style="grid-template-columns:repeat(4,1fr)">
     <button class="tbtn on" data-tab="brain">뇌</button>
     <button class="tbtn" data-tab="home">오늘</button>
@@ -897,19 +913,73 @@ function brainStep(ts){
 }
 function drawBrainLife(ctx,x,y,r,t,ts,ph,dark){
   const lf=lifeOf(t); if(!lf.total) return;
-  ctx.save(); ctx.lineCap="round"; const rr=r+3.8,start=-Math.PI/2;
-  ctx.strokeStyle=dark?"rgba(82,240,166,.17)":"rgba(52,199,89,.15)"; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(x,y,rr,0,Math.PI*2); ctx.stroke();
-  if(lf.done){
-    const end=start+Math.PI*2*lf.ratio; ctx.strokeStyle=dark?"#55F0A2":"#34C759"; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(x,y,rr,start,end); ctx.stroke();
-    const ex=x+Math.cos(end)*rr,ey=y+Math.sin(end)*rr; ctx.fillStyle=dark?"#8FFFC2":"#34C759"; ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=dark?6:2;
-    ctx.beginPath(); ctx.arc(ex,ey,1.5,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
-    const specks=Math.min(4,Math.max(1,Math.ceil(lf.ratio*4)));
-    for(let j=0;j<specks;j++){ const a=ph+j*2.399+ts*.00004*(j%2?1:-1),d=r*(.3+.42*((j*31)%10)/10);
-      ctx.fillStyle=j%2?(dark?"rgba(84,226,255,.78)":"rgba(48,176,199,.72)"):(dark?"rgba(92,240,162,.82)":"rgba(52,199,89,.76)");
-      ctx.beginPath(); ctx.arc(x+Math.cos(a)*d,y+Math.sin(a)*d,Math.max(.65,Math.min(1.25,r*.085)),0,Math.PI*2); ctx.fill(); }
-    if(lf.ratio>=.999){ const pulse=.34+.17*Math.sin(ts/650+ph); ctx.strokeStyle=dark?`rgba(92,240,162,${pulse})`:`rgba(52,199,89,${pulse*.72})`; ctx.lineWidth=1.3; ctx.beginPath(); ctx.arc(x,y,r+6.4,0,Math.PI*2); ctx.stroke(); }
+  const ratio=Math.max(0,Math.min(1,lf.ratio));
+  if(!(lf.done&&ratio>0)) return;
+
+  const start=-Math.PI/2;
+  const end=start+Math.PI*2*ratio;
+  const bodyR=r;
+  const auraOuter=bodyR+Math.max(3.5,bodyR*.15);
+
+  ctx.save();
+  ctx.lineCap="round";
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x,y);
+  ctx.arc(x,y,auraOuter+2,start,end,false);
+  ctx.closePath();
+  ctx.clip();
+
+  const g=ctx.createRadialGradient(x,y,Math.max(0,bodyR-3.0),x,y,auraOuter);
+  g.addColorStop(0.00,"rgba(52,215,199,0)");
+  g.addColorStop(0.38,"rgba(52,215,199,.020)");
+  g.addColorStop(0.49,dark?"rgba(72,198,255,.16)":"rgba(55,185,215,.13)");
+  g.addColorStop(0.56,dark?"rgba(122,222,255,.35)":"rgba(78,198,226,.25)");
+  g.addColorStop(0.64,dark?"rgba(74,166,255,.19)":"rgba(66,164,216,.13)");
+  g.addColorStop(1.00,"rgba(54,128,255,0)");
+  ctx.globalCompositeOperation=dark?"lighter":"source-over";
+  ctx.fillStyle=g;
+  ctx.beginPath(); ctx.arc(x,y,auraOuter,0,Math.PI*2); ctx.fill();
+
+  const rim=ctx.createLinearGradient(x-bodyR,y-bodyR,x+bodyR,y+bodyR);
+  rim.addColorStop(0,"rgba(52,215,199,.86)");
+  rim.addColorStop(.52,"rgba(103,211,255,.94)");
+  rim.addColorStop(1,"rgba(78,143,255,.88)");
+  ctx.strokeStyle=rim;
+  ctx.lineWidth=Math.max(.68,Math.min(1.02,bodyR*.031));
+  ctx.shadowColor=dark?"rgba(86,196,255,.54)":"rgba(70,180,215,.31)";
+  ctx.shadowBlur=dark?2.5:1.3;
+  ctx.beginPath(); ctx.arc(x,y,bodyR+.38,start,end); ctx.stroke();
+  ctx.shadowBlur=0;
+  ctx.restore();
+
+  if(ratio<.999){
+    const rr=bodyR+.44;
+    const ex=x+Math.cos(end)*rr, ey=y+Math.sin(end)*rr;
+    ctx.save();
+    ctx.globalCompositeOperation=dark?"lighter":"source-over";
+    ctx.globalAlpha=.70;
+    ctx.fillStyle=dark?"rgba(192,240,255,.94)":"rgba(100,210,225,.86)";
+    ctx.shadowColor=dark?"rgba(88,198,255,.60)":"rgba(65,180,210,.35)";
+    ctx.shadowBlur=dark?2.7:1.4;
+    ctx.beginPath(); ctx.arc(ex,ey,.76,0,Math.PI*2); ctx.fill();
+    ctx.restore();
   }
+
+  const specks=Math.min(2,Math.max(1,Math.ceil(ratio*2)));
+  for(let j=0;j<specks;j++){
+    const a=ph+j*2.55+ts*.000012*(j?1:-1);
+    const d=bodyR*(.20+.18*((j*31)%10)/10);
+    const alpha=.068+.060*ratio;
+    ctx.fillStyle=j%2
+      ?(dark?`rgba(98,204,255,${alpha})`:`rgba(50,176,200,${alpha})`)
+      :(dark?`rgba(78,224,201,${alpha})`:`rgba(52,199,150,${alpha})`);
+    ctx.beginPath();
+    ctx.arc(x+Math.cos(a)*d,y+Math.sin(a)*d,Math.max(.38,Math.min(.58,bodyR*.041)),0,Math.PI*2);
+    ctx.fill();
+  }
+
   ctx.restore();
 }
 function brainDraw(ts){
