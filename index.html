@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Work Brain 모바일 v2.9.3</title>
+<title>Work Brain 모바일 v2.9.4</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -124,7 +124,7 @@ details.rec[open] .rsum{display:none}
 </head>
 <body>
 <header class="glass">
-  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v2.9.3</span></span><span class="sync" id="sync">연결 중…</span></div>
+  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v2.9.4</span></span><span class="sync" id="sync">연결 중…</span></div>
   <div class="hbtns" style="grid-template-columns:repeat(4,1fr)">
     <button class="tbtn on" data-tab="brain">뇌</button>
     <button class="tbtn" data-tab="home">오늘</button>
@@ -164,6 +164,7 @@ const KINDS=["지시","위임","조치","보고","피드백","협의","변경","
 const KIND_LABEL={지시:"지시받음",위임:"맡김",조치:"조치",보고:"보고",피드백:"피드백",협의:"협의",변경:"변경",완료:"완료",메모:"메모",정정:"정정",확인:"확인 메일"};
 const CHANNELS=["","구두","메일","전화","메신저","결재","회의","공문","기타"];
 const ROLES=["부센터장","센터장","사무국장","본부장","이사장","국장","재단","서울시","구청","주무관"];
+const ALL_PERSON="전체";
 function parseWhen(text,now=new Date()){
   const today=sod(now); let date=null,hasTime=false,h=null,mi=0; const spans=[]; let m;
   if((m=text.match(/(\d{1,2})\s*(?:\/|월\s*|\.\s*)(\d{1,2})\s*일?/))&&+m[1]>=1&&+m[1]<=12&&+m[2]>=1&&+m[2]<=31){
@@ -201,7 +202,7 @@ function splitWhen(text,now=new Date()){
 }
 function detectPeople(t,people){
   let to="",from="";
-  const names=[...new Set([...(people||[]),...ROLES])].sort((a,b)=>b.length-a.length);
+  const names=[...new Set([ALL_PERSON,...(people||[]),...ROLES])].sort((a,b)=>b.length-a.length);
   const q=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
   let m=t.match(/@([가-힣A-Za-z0-9]+?)(?:에게|한테|께|님께)/); if(m) to=m[1];
   if(!to) for(const n of names) if(new RegExp(q(n)+"(?:님)?(?:에게|한테|께)").test(t)){to=n;break;}
@@ -245,6 +246,10 @@ function dice(a,b){if(!a.size||!b.size)return 0;let n=0;for(const x of a)if(b.ha
 /* ---------- 상태 ---------- */
 let USER=null;
 let tasks=[], entries=[], people=[], tab="brain", filter="", openTaskId=null, pending=null, ready=0;
+const staffPeople=()=>[...new Set((people||[]).filter(p=>p&&p!=="나"&&p!==ALL_PERSON))];
+const isBroadcastEntry=e=>!!e&&(e.from===ALL_PERSON||e.to===ALL_PERSON);
+const entryHasPerson=(e,name)=>!!e&&(e.from===name||e.to===name||String(e.raw||"").includes(name)||(isBroadcastEntry(e)&&staffPeople().includes(name)));
+function lifeOf(t){ const a=(t&&t.items)||[], total=a.length, done=a.filter(i=>i.doneAt).length; return {total,done,ratio:total?done/total:0}; }
 const byId=id=>tasks.find(t=>t.id===id);
 const entriesOf=id=>entries.filter(e=>e.taskId===id).sort((a,b)=>a.occurredAt-b.occurredAt);
 const lastAt=t=>{const es=entries.filter(e=>e.taskId===t.id);return es.length?Math.max(...es.map(e=>e.at)):t.createdAt;};
@@ -414,7 +419,7 @@ function unpack(r){
     }
   }
   entries.sort((a,b)=>a.at-b.at);
-  for(const p of (r.people||[])) if(p&&p!=="나"&&!people.includes(p)) people.push(p);
+  for(const p of (r.people||[])) if(p&&p!=="나"&&p!==ALL_PERSON&&!people.includes(p)) people.push(p);
   const tombMap=new Map((state.tombs||[]).map(t=>[t.id,t]));
   for(const t of (r.tombs||[])) if(t&&t.id&&!tombMap.has(t.id)){ (state.tombs=state.tombs||[]).push(t); tombMap.set(t.id,t); }
   const wp=state.wikiPeople=state.wikiPeople||{};
@@ -456,7 +461,7 @@ async function flushOnHide(){
 }
 async function saveTask(t){ t.updatedAt=Date.now(); if(!tasks.includes(t)) tasks.push(t); saveLocal(); render(); }
 async function saveEntry(e){ entries.push(e); entries.sort((a,b)=>a.at-b.at);
-  for(const n of [e.from,e.to]) if(n&&n!=="나"&&!people.includes(n)) people.push(n);
+  for(const n of [e.from,e.to]) if(n&&n!=="나"&&n!==ALL_PERSON&&!people.includes(n)) people.push(n);
   saveLocal(); render(); }
 async function delTask(t){ state.syncDeleted=state.syncDeleted||{}; state.syncDeleted[t.id]=Date.now();
   tasks=tasks.filter(x=>x.id!==t.id); entries=entries.filter(e=>e.taskId!==t.id); saveLocal(); render(); }
@@ -528,6 +533,7 @@ function openConfirm(){
     <label class="fld">종류</label><select id="cKind">${kindOpts}</select>
     ${p.kind==="피드백"?`<label class="fld">피드백 결과</label><select id="cFb">${["수정 요청","승인","보류","의견"].map(x=>`<option ${x===p.fb?"selected":""}>${x}</option>`).join("")}</select>`:""}
     <label class="fld">${p.kind==="지시"?"지시한 사람":p.kind==="피드백"?"피드백 준 사람":"한 사람"}</label><input id="cFrom" value="${esc(p.from)}" placeholder="${p.kind==="지시"?"이름 또는 직책":"나"}">
+    ${p.kind==="위임"||p.kind==="보고"?`<label class="fld">${p.kind==="위임"?"맡은 사람":"보고받은 사람"}</label><input id="cTo" value="${esc(p.to||"")}" placeholder="직원 이름 또는 전체">`:""}
     <label class="fld">방식</label><select id="cCh">${CHANNELS.map(c=>`<option value="${c}" ${c===p.channel?"selected":""}>${c||"-"}</option>`).join("")}</select>
     <label class="fld">일어난 때</label><input type="datetime-local" id="cOcc" value="${o.getFullYear()}-${pad(o.getMonth()+1)}-${pad(o.getDate())}T${pad(o.getHours())}:${pad(o.getMinutes())}">
     <label class="fld">기한</label><input type="datetime-local" id="cDue" value="${d?`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`:""}">
@@ -541,7 +547,7 @@ function readConfirm(){
   const p=pending; if(!p||!$("cBody")) return;
   p.body=$("cBody").value.trim()||p.body;
   if($("cTitle")) p.title=$("cTitle").value.trim()||p.title;
-  p.kind=$("cKind").value; p.from=$("cFrom").value.trim(); p.channel=$("cCh").value; p.evidence=$("cEv").value.trim();
+  p.kind=$("cKind").value; p.from=$("cFrom").value.trim(); if($("cTo")) p.to=$("cTo").value.trim(); p.channel=$("cCh").value; p.evidence=$("cEv").value.trim();
   if($("cFb")) p.fb=$("cFb").value;
   if($("cOcc").value) p.occ=new Date($("cOcc").value).getTime();
   p.due=$("cDue").value?{iso:new Date($("cDue").value).getTime(),hasTime:true}:null;
@@ -612,7 +618,7 @@ function homeHTML(){
 function listHTML(){
   const q=filter.trim();
   let list=tasks.filter(t=>!t.isGroup);
-  if(q) list=list.filter(t=>(t.title+" "+entriesOf(t.id).map(e=>e.raw+e.from+e.to).join(" ")).includes(q));
+  if(q) list=list.filter(t=>t.title.includes(q)||entriesOf(t.id).some(e=>(e.raw+e.from+e.to).includes(q)||(staffPeople().includes(q)&&entryHasPerson(e,q))));
   const open=list.filter(t=>t.status!=="완료").sort((a,b)=>{
     const rank=x=>({red:0,yellow:1,green:2,wait:3,done:4})[signalOf(x).code];
     return rank(a)-rank(b)||lastAt(b)-lastAt(a);
@@ -843,13 +849,18 @@ function brainSync(){
   const R=()=>(Math.random()-.5)*260;
   const add=(id,type,label,extra)=>{ const n=old.get(id)||{id,x:R(),y:R(),z:R(),vx:0,vy:0,vz:0,ph:Math.random()*6.3};
     Object.assign(n,{type,label},extra); nodes.push(n); seen.set(id,n); return n; };
-  const ppl=new Map();
+  const ppl=new Map(), staff=staffPeople();
   for(const t of tasks){
     if(t.isGroup) add("t:"+t.id,"group",t.title,{tid:t.id,r:13});
     else{
       const es=entries.filter(e=>e.taskId===t.id);
       add("t:"+t.id,"task",t.title,{tid:t.id,r:7+Math.min(6,Math.sqrt(es.length)*1.6),sig:signalOf(t).code});
-      for(const e of es) for(const p of [e.from,e.to]) if(p&&p!=="나"){ if(!ppl.has(p)) ppl.set(p,new Set()); ppl.get(p).add(t.id); }
+      let broadcast=false;
+      for(const e of es) for(const p of [e.from,e.to]){
+        if(p===ALL_PERSON){ broadcast=true; continue; }
+        if(p&&p!=="나"){ if(!ppl.has(p)) ppl.set(p,new Set()); ppl.get(p).add(t.id); }
+      }
+      if(broadcast) for(const p of staff){ if(!ppl.has(p)) ppl.set(p,new Set()); ppl.get(p).add(t.id); }
     }
     if(t.parentId&&tasks.some(x=>x.id===t.parentId)) raw.push(["t:"+t.parentId,"t:"+t.id,"tree"]);
   }
@@ -883,6 +894,23 @@ function brainStep(ts){
     n.vy+=-n.y*.003+Math.cos(ts*.00035+n.ph)*.02;
     n.vz+=-n.z*.003+Math.sin(ts*.0003+n.ph*1.7)*.02;
     n.vx*=.84; n.vy*=.84; n.vz*=.84; n.x+=n.vx; n.y+=n.vy; n.z+=n.vz; }
+}
+function drawBrainLife(ctx,x,y,r,t,ts,ph,dark){
+  const lf=lifeOf(t); if(!lf.total) return;
+  ctx.save(); ctx.lineCap="round"; const rr=r+3.8,start=-Math.PI/2;
+  ctx.strokeStyle=dark?"rgba(82,240,166,.17)":"rgba(52,199,89,.15)"; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(x,y,rr,0,Math.PI*2); ctx.stroke();
+  if(lf.done){
+    const end=start+Math.PI*2*lf.ratio; ctx.strokeStyle=dark?"#55F0A2":"#34C759"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(x,y,rr,start,end); ctx.stroke();
+    const ex=x+Math.cos(end)*rr,ey=y+Math.sin(end)*rr; ctx.fillStyle=dark?"#8FFFC2":"#34C759"; ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=dark?6:2;
+    ctx.beginPath(); ctx.arc(ex,ey,1.5,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+    const specks=Math.min(4,Math.max(1,Math.ceil(lf.ratio*4)));
+    for(let j=0;j<specks;j++){ const a=ph+j*2.399+ts*.00004*(j%2?1:-1),d=r*(.3+.42*((j*31)%10)/10);
+      ctx.fillStyle=j%2?(dark?"rgba(84,226,255,.78)":"rgba(48,176,199,.72)"):(dark?"rgba(92,240,162,.82)":"rgba(52,199,89,.76)");
+      ctx.beginPath(); ctx.arc(x+Math.cos(a)*d,y+Math.sin(a)*d,Math.max(.65,Math.min(1.25,r*.085)),0,Math.PI*2); ctx.fill(); }
+    if(lf.ratio>=.999){ const pulse=.34+.17*Math.sin(ts/650+ph); ctx.strokeStyle=dark?`rgba(92,240,162,${pulse})`:`rgba(52,199,89,${pulse*.72})`; ctx.lineWidth=1.3; ctx.beginPath(); ctx.arc(x,y,r+6.4,0,Math.PI*2); ctx.stroke(); }
+  }
+  ctx.restore();
 }
 function brainDraw(ts){
   const ctx=B.ctx, dark=darkMode();
@@ -919,6 +947,7 @@ function brainDraw(ts){
     ctx.fillStyle=g; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,7); ctx.fill();
     ctx.strokeStyle=n.type==="group"?"#0A84FF":(dark?"rgba(0,0,0,.5)":"rgba(255,255,255,.9)");
     ctx.lineWidth=n.type==="group"?2:1.2; ctx.stroke();
+    if(n.type==="task"){ const t=byId(n.tid); if(t) drawBrainLife(ctx,p.x,p.y,r,t,ts,n.ph,dark); }
     if(n.type==="person"&&r>=7){ ctx.fillStyle="#fff"; ctx.font=`600 ${Math.round(r*.9)}px -apple-system,sans-serif`; ctx.fillText(priv?"•":n.label[0],p.x,p.y+.5); }
     const near=p.s>0.5;
     if(near||n.type==="group"||(n.type==="task"&&n.sig==="red"&&p.s>0.6)){
