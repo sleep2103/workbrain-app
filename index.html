@@ -2,8 +2,8 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Work Brain 모바일</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Work Brain 모바일 v2.9.3</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -19,9 +19,10 @@
 }
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px);background:#F2F4F8}
-html,body{margin:0;height:100%;color:var(--ink);line-height:1.5;
-  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
-body{background:
+html,body{margin:0;height:100%;width:100%;max-width:100%;color:var(--ink);line-height:1.5;
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;-webkit-font-smoothing:antialiased;letter-spacing:-.01em;
+  -webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{max-width:100vw;overflow-x:hidden;background:
   radial-gradient(45% 30% at 15% 10%,rgba(10,132,255,.12),transparent 70%),
   radial-gradient(40% 30% at 90% 15%,rgba(175,82,222,.10),transparent 70%),
   radial-gradient(45% 35% at 80% 90%,rgba(48,176,199,.10),transparent 70%),#F2F4F8;
@@ -31,7 +32,9 @@ body{background:
   --glass:rgba(28,28,30,.72); --edge:rgba(255,255,255,.08); }
   :root:not([data-theme="light"]) html,:root:not([data-theme="light"]) body{background:#0B0B0F}
 }
-button,input,textarea,select{font:inherit;color:inherit}
+button,input,textarea,select{font:inherit;color:inherit;min-width:0}
+input,textarea,select{font-size:16px!important}
+img,svg,canvas{max-width:100%}
 button{cursor:pointer}
 .glass{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--edge);box-shadow:var(--shadow)}
 header{display:flex;flex-direction:column;gap:6px;padding:8px 12px 10px;position:sticky;top:0;z-index:20}
@@ -48,7 +51,11 @@ main.brainmode{overflow:hidden;padding:0;pointer-events:none}
 body.space{background:radial-gradient(45% 38% at 20% 25%,rgba(70,60,190,.25),transparent 70%),radial-gradient(38% 30% at 82% 18%,rgba(150,50,160,.18),transparent 72%),radial-gradient(50% 42% at 72% 88%,rgba(20,90,150,.2),transparent 72%),#03040B!important}
 :root[data-theme="dark"]{--ink:#E9ECF6;--sub:#9CA3BA;--faint:#6B7189;--line:rgba(255,255,255,.10);--glass:rgba(16,19,34,.62);--edge:rgba(255,255,255,.09)}
 :root[data-theme="dark"] html,:root[data-theme="dark"] body{color:var(--ink)}
-#brain{position:fixed;inset:0;z-index:3;display:none;touch-action:none;-webkit-user-select:none;user-select:none}
+:root{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
+:root[data-theme="dark"] select option,:root[data-theme="dark"] select optgroup{background:#161A2B;color:#E9ECF6}
+:root[data-theme="dark"] select optgroup{color:#8C93AD}
+#brain{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:3;display:none;touch-action:none;-webkit-user-select:none;user-select:none}
 #brain.on{display:block}
 .bottom{position:fixed;left:0;right:0;bottom:0;z-index:15;padding:8px 12px calc(10px + env(safe-area-inset-bottom,0px));
   background:linear-gradient(transparent,rgba(242,244,248,.88) 45%)}
@@ -58,7 +65,7 @@ body.space{background:radial-gradient(45% 38% at 20% 25%,rgba(70,60,190,.25),tra
 .braintip{position:fixed;left:50%;transform:translateX(-50%);top:calc(92px + env(safe-area-inset-top,0px));z-index:6;white-space:nowrap;
   font-size:.7rem;opacity:.85;color:var(--sub);background:var(--glass);backdrop-filter:blur(10px);padding:5px 12px;border-radius:99px;border:1px solid var(--edge);display:none}
 .braintip.on{display:block}
-.wrap{max-width:720px;margin:0 auto}
+.wrap{width:100%;max-width:720px;min-width:0;margin:0 auto}
 .omni{display:flex;gap:8px;align-items:flex-end;border-radius:16px;padding:10px 12px;margin:6px 0 12px}
 .omni textarea{flex:1;border:0;background:transparent;resize:none;outline:none;font-size:1rem;min-height:38px;max-height:140px}
 .icon{border:0;background:rgba(0,0,0,.05);border-radius:10px;width:36px;height:34px;display:flex;align-items:center;justify-content:center;color:var(--sub);flex:none}
@@ -110,14 +117,14 @@ details.rec[open] .rsum{display:none}
 .tabs{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px;position:sticky;top:0;z-index:10}
 .modal{position:fixed;inset:0;z-index:50;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.25);backdrop-filter:blur(4px)}
 .modal.on{display:flex}
-.sheet{width:100%;max-width:640px;max-height:88vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom,0px))}
+.sheet{width:100%;max-width:640px;min-width:0;max-height:88vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom,0px))}
 @media (min-width:700px){.modal{align-items:center}.sheet{border-radius:20px;max-height:84vh}}
 .grab{width:38px;height:4px;border-radius:99px;background:var(--line);margin:0 auto 10px}
 </style>
 </head>
 <body>
 <header class="glass">
-  <div class="hrow"><span class="logo">WORK BRAIN</span><span class="sync" id="sync">연결 중…</span></div>
+  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v2.9.3</span></span><span class="sync" id="sync">연결 중…</span></div>
   <div class="hbtns" style="grid-template-columns:repeat(4,1fr)">
     <button class="tbtn on" data-tab="brain">뇌</button>
     <button class="tbtn" data-tab="home">오늘</button>
@@ -324,20 +331,34 @@ function lamp(t){
 
 /* ---------- 저장 (GitHub 동기화) ---------- */
 const LS="workbrain_mobile_v1", GH_FILE="workbrain.json";
-let GH=null, state={tasks:[],entries:[],people:[],syncDeleted:{},lastSync:0}, syncing=false, pushTimer=null, sha=null;
+let GH=null, state={tasks:[],entries:[],people:[],syncDeleted:{},tombs:[],wikiPeople:{},syncMeta:{},lastSync:0}, syncing=false, pushTimer=null, sha=null;
 function loadLocal(){
   try{ const raw=localStorage.getItem(LS); if(raw) state=Object.assign(state,JSON.parse(raw)); }catch{}
   try{ GH=JSON.parse(localStorage.getItem("workbrain_gh")||"null"); }catch{ GH=null; }
-  tasks=state.tasks; entries=state.entries; people=state.people||[];
+  state.syncDeleted=state.syncDeleted||{}; state.tombs=state.tombs||[]; state.wikiPeople=state.wikiPeople||{}; state.syncMeta=state.syncMeta||{};
+  tasks=state.tasks||[]; entries=state.entries||[]; people=state.people||[];
 }
 function saveLocal(){ state.tasks=tasks; state.entries=entries; state.people=people;
   try{ localStorage.setItem(LS,JSON.stringify(state)); }catch{ toast("이 기기에 저장하지 못했습니다."); }
   schedulePush(); }
 const ghHeaders=()=>({Authorization:"Bearer "+GH.token,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"});
-function ghErr(code){ return {401:"토큰이 맞지 않습니다.",403:"토큰 권한이 모자랍니다.",404:"저장소나 파일을 찾지 못했습니다.",409:"다른 기기가 먼저 올렸습니다. 다시 시도합니다."}[code]||`동기화 오류 (${code})`; }
+function ghErr(code){ return {401:"토큰이 맞지 않습니다.",403:"토큰 권한이 모자랍니다. Contents: Read and write 권한을 확인하세요.",404:"저장소를 찾지 못했거나 이 토큰에 접근 권한이 없습니다.",409:"다른 기기가 먼저 올렸습니다. 다시 시도합니다.",422:"브랜치 또는 저장소 설정을 확인하세요."}[code]||`동기화 오류 (${code})`; }
+async function ghProbeAccess(){
+  const owner=encodeURIComponent(GH.owner), repo=encodeURIComponent(GH.repo), branch=encodeURIComponent(GH.branch||"main");
+  const rr=await fetch(`https://api.github.com/repos/${owner}/${repo}?t=${Date.now()}`,{headers:ghHeaders(),cache:"no-store"});
+  if(!rr.ok){
+    if(rr.status===404) throw new Error("저장소를 찾지 못했거나 토큰이 이 Private 저장소에 접근할 수 없습니다. 사용자 이름·저장소 선택·토큰 권한을 확인하세요.");
+    throw new Error(ghErr(rr.status));
+  }
+  const br=await fetch(`https://api.github.com/repos/${owner}/${repo}/branches/${branch}?t=${Date.now()}`,{headers:ghHeaders(),cache:"no-store"});
+  if(br.status===404) throw new Error(`브랜치 '${GH.branch||"main"}'를 찾지 못했습니다.`);
+  if(!br.ok) throw new Error(ghErr(br.status));
+  return true;
+}
 async function ghGet(){
-  const r=await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH_FILE}?ref=${GH.branch||"main"}&t=${Date.now()}`,{headers:ghHeaders(),cache:"no-store"});
-  if(r.status===404) return {data:null,sha:null};
+  const owner=encodeURIComponent(GH.owner), repo=encodeURIComponent(GH.repo), branch=encodeURIComponent(GH.branch||"main");
+  const r=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${GH_FILE}?ref=${branch}&t=${Date.now()}`,{headers:ghHeaders(),cache:"no-store"});
+  if(r.status===404){ await ghProbeAccess(); return {data:null,sha:null}; }
   if(!r.ok) throw new Error(ghErr(r.status));
   const j=await r.json();
   const text=new TextDecoder().decode(Uint8Array.from(atob(j.content.replace(/\n/g,"")),c=>c.charCodeAt(0)));
@@ -347,17 +368,24 @@ async function ghPut(obj,shaIn){
   const body=JSON.stringify({message:`work brain mobile ${new Date().toISOString()}`,
     content:btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(obj)))),
     sha:shaIn||undefined,branch:GH.branch||"main"});
-  const r=await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH_FILE}`,
+  const r=await fetch(`https://api.github.com/repos/${encodeURIComponent(GH.owner)}/${encodeURIComponent(GH.repo)}/contents/${GH_FILE}`,
     {method:"PUT",headers:{...ghHeaders(),"Content-Type":"application/json"},body});
   if(r.status===409) return null;
   if(!r.ok) throw new Error(ghErr(r.status));
   return (await r.json()).content.sha;
 }
 function packUp(){
-  return {v:1,at:Date.now(),tasks:tasks.map(t=>({...t,due:t.due?{iso:new Date(t.due).toISOString(),hasTime:!!t.dueHasTime}:null})),
-    entries:entries.map(e=>({...e,images:[],files:e.files||[]})),people,deleted:state.syncDeleted||{},tombs:[]};
+  return {v:1,at:Date.now(),
+    tasks:tasks.map(t=>({...t,due:t.due?{iso:new Date(t.due).toISOString(),hasTime:!!t.dueHasTime}:null})),
+    entries:entries.map(e=>({...e,images:[],files:(e.files||[]).map(f=>({id:f.id,name:f.name,size:f.size,sha:f.sha,locked:f.locked,mail:f.mail?{subject:f.mail.subject,from:f.mail.from,date:f.mail.date,messageId:f.mail.messageId}:undefined}))})),
+    people:people||[],
+    tombs:state.tombs||[],
+    wikiPeople:state.wikiPeople||{},
+    deleted:state.syncDeleted||{},
+    meta:state.syncMeta||{}};
 }
 function unpack(r){
+  if(!r||!Array.isArray(r.tasks)) return {nt:0,ne:0};
   const del={...(state.syncDeleted||{}),...(r.deleted||{})}; state.syncDeleted=del;
   let nt=0,ne=0;
   const tmap=new Map(tasks.map(t=>[t.id,t]));
@@ -366,7 +394,7 @@ function unpack(r){
     if(rt.due&&typeof rt.due==="object"){ rt.dueHasTime=!!rt.due.hasTime; rt.due=new Date(rt.due.iso).getTime(); }
     if(del[rt.id]&&del[rt.id]>=(rt.updatedAt||0)) continue;
     const cur=tmap.get(rt.id);
-    if(!cur){ tasks.push(rt); nt++; }
+    if(!cur){ tasks.push(rt); tmap.set(rt.id,rt); nt++; }
     else if((rt.updatedAt||0)>(cur.updatedAt||0)){ Object.assign(cur,rt); nt++; }
   }
   for(const [id,at] of Object.entries(del)){
@@ -374,12 +402,24 @@ function unpack(r){
     if(i>=0){ tasks.splice(i,1); entries=entries.filter(e=>e.taskId!==id); }
   }
   const emap=new Map(entries.map(e=>[e.id,e]));
-  for(const re of r.entries||[]){
-    if(del[re.taskId]) continue;
-    if(!emap.has(re.id)){ entries.push(re); ne++; }
+  for(const re0 of r.entries||[]){
+    if(del[re0.taskId]) continue;
+    const re={...re0,images:re0.images||[],files:re0.files||[]};
+    const cur=emap.get(re.id);
+    if(!cur){ entries.push(re); emap.set(re.id,re); ne++; }
+    else{
+      const rr=(re.rev||[]).length, cr=(cur.rev||[]).length;
+      if(rr>cr||(rr===cr&&(re.at||0)>(cur.at||0)&&re.raw!==cur.raw)){ Object.assign(cur,re); ne++; }
+      if((re.files||[]).length&&!(cur.files||[]).length) cur.files=re.files;
+    }
   }
   entries.sort((a,b)=>a.at-b.at);
   for(const p of (r.people||[])) if(p&&p!=="나"&&!people.includes(p)) people.push(p);
+  const tombMap=new Map((state.tombs||[]).map(t=>[t.id,t]));
+  for(const t of (r.tombs||[])) if(t&&t.id&&!tombMap.has(t.id)){ (state.tombs=state.tombs||[]).push(t); tombMap.set(t.id,t); }
+  const wp=state.wikiPeople=state.wikiPeople||{};
+  for(const [n,v] of Object.entries(r.wikiPeople||{})) if(v&&(!wp[n]||(v.at||0)>(wp[n].at||0))) wp[n]=v;
+  state.syncMeta={...(state.syncMeta||{}),...(r.meta||{})};
   return {nt,ne};
 }
 async function syncNow(silent){
@@ -437,7 +477,7 @@ function ghSheet(){
       token:$("ghTok").value.trim()||(GH?GH.token:"")};
     if(!conf.owner||!conf.repo||!conf.token){ toast("모두 채워 주세요."); return; }
     const prev=GH; GH=conf; $("ghOk").disabled=true; $("ghOk").textContent="확인 중…";
-    try{ await ghGet(); localStorage.setItem("workbrain_gh",JSON.stringify(conf)); closeSheet(); toast("연결했습니다."); syncNow(false); }
+    try{ await ghProbeAccess(); await ghGet(); localStorage.setItem("workbrain_gh",JSON.stringify(conf)); closeSheet(); toast("연결했습니다. PC와 같은 저장소를 사용합니다."); syncNow(false); }
     catch(e){ GH=prev; $("ghOk").disabled=false; $("ghOk").textContent="연결 확인"; toast(e.message||"연결하지 못했습니다."); }
   };
 }
@@ -758,8 +798,8 @@ function glow(ctx,x,y,r,col,k){ const g=ctx.createRadialGradient(x,y,0,x,y,r*3.4
   ctx.globalCompositeOperation="lighter"; const a=ctx.globalAlpha; ctx.globalAlpha=a*k; ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r*3.4,0,7); ctx.fill(); ctx.globalAlpha=a; ctx.globalCompositeOperation="source-over"; }
 function brainInit(){
   B.cv=$("brain"); B.ctx=B.cv.getContext("2d");
-  const rs=()=>{ B.dpr=devicePixelRatio||1; B.W=innerWidth; B.H=innerHeight; B.cv.width=B.W*B.dpr; B.cv.height=B.H*B.dpr; };
-  rs(); addEventListener("resize",rs);
+  const rs=()=>{ B.dpr=Math.min(3,devicePixelRatio||1); B.W=innerWidth; B.H=innerHeight; B.cv.width=Math.round(B.W*B.dpr); B.cv.height=Math.round(B.H*B.dpr); B.cv.style.width=B.W+"px"; B.cv.style.height=B.H+"px"; };
+  rs(); addEventListener("resize",rs); addEventListener("orientationchange",()=>setTimeout(rs,300));
   const down=(x,y)=>{ B.ptr={x,y,m:0,n:brainHit(x,y)}; B.auto=false; };
   const move=(x,y)=>{ if(!B.ptr) return; const dx=x-B.ptr.x, dy=y-B.ptr.y;
     B.ptr.m+=Math.abs(dx)+Math.abs(dy); B.ptr.x=x; B.ptr.y=y;
@@ -994,7 +1034,7 @@ $("mic").onclick=()=>{
 document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{ tab=b.dataset.tab; render(); });
 
 if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
-  navigator.serviceWorker.register("sw.js").catch(()=>{});
+  navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(reg=>reg.update()).catch(()=>{});
 }
 /* ---------- 시작 ---------- */
 loadLocal(); applyTheme(); ready=3; syncNote(); brainInit(); render();
