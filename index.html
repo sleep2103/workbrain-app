@@ -754,8 +754,8 @@ function spaceBack(ctx,ts){
     ctx.beginPath(); ctx.arc(p.x,p.y,Math.max(.5,1.1*p.s),0,7); ctx.fill(); }
   ctx.globalCompositeOperation="source-over";
 }
-function glow(ctx,x,y,r,col,k){ const g=ctx.createRadialGradient(x,y,0,x,y,r*4); g.addColorStop(0,col+"cc"); g.addColorStop(.25,col+"55"); g.addColorStop(1,col+"00");
-  ctx.globalCompositeOperation="lighter"; const a=ctx.globalAlpha; ctx.globalAlpha=a*k; ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r*4,0,7); ctx.fill(); ctx.globalAlpha=a; ctx.globalCompositeOperation="source-over"; }
+function glow(ctx,x,y,r,col,k){ const g=ctx.createRadialGradient(x,y,0,x,y,r*3.4); g.addColorStop(0,col+"cc"); g.addColorStop(.25,col+"55"); g.addColorStop(1,col+"00");
+  ctx.globalCompositeOperation="lighter"; const a=ctx.globalAlpha; ctx.globalAlpha=a*k; ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r*3.4,0,7); ctx.fill(); ctx.globalAlpha=a; ctx.globalCompositeOperation="source-over"; }
 function brainInit(){
   B.cv=$("brain"); B.ctx=B.cv.getContext("2d");
   const rs=()=>{ B.dpr=devicePixelRatio||1; B.W=innerWidth; B.H=innerHeight; B.cv.width=B.W*B.dpr; B.cv.height=B.H*B.dpr; };
@@ -793,7 +793,7 @@ function proj(n){
 }
 function brainHit(x,y){
   let best=null,bd=1e9;
-  for(const n of B.nodes){ const p=proj(n); const r=Math.max(12,n.r*p.s*2.4); const d=Math.hypot(p.x-x,p.y-y);
+  for(const n of B.nodes){ const p=proj(n); const r=Math.max(14,n.r*p.s*1.3+10); const d=Math.hypot(p.x-x,p.y-y);
     if(d<r+16&&d<bd){ bd=d; best=n; } }
   return best;
 }
@@ -866,12 +866,12 @@ function brainDraw(ts){
   const fits=(x,y,w,h)=>{ for(const b of boxes) if(Math.abs(x-b.x)*2<(w+b.w)&&Math.abs(y-b.y)*2<(h+b.h)) return false; boxes.push({x,y,w,h}); return true; };
   ctx.textAlign="center"; ctx.textBaseline="middle";
   for(const n of order){
-    const p=P.get(n), r=n.r*p.s*1.5;
+    const p=P.get(n), r=Math.max(2.6,n.r*p.s*1.3);
     if(p.x<-60||p.y<-60||p.x>B.W+60||p.y>B.H+60||r<1.5) continue;
     const dep=Math.max(.25,Math.min(1,p.s*1.15));
     ctx.globalAlpha=dep;
     if(!dark&&n.type==="task"&&n.sig==="red"){ ctx.fillStyle="rgba(255,59,48,.16)";
-      ctx.beginPath(); ctx.arc(p.x,p.y,r+5+1.5*Math.sin(ts/480+n.ph),0,7); ctx.fill(); }
+      ctx.beginPath(); ctx.arc(p.x,p.y,r+3+1*Math.sin(ts/480+n.ph),0,7); ctx.fill(); }
     const base=n.type==="task"?(SIGC[n.sig]||"#0A84FF"):n.type==="person"?"#AF52DE":(dark?"#1A1D30":"#FFFFFF");
     if(dark&&n.type!=="group") glow(ctx,p.x,p.y,r,n.type==="person"?"#B86BFF":base,n.sig==="red"?1.1:.8);
     const g=ctx.createRadialGradient(p.x-r*.35,p.y-r*.4,r*.15,p.x,p.y,r);
@@ -879,14 +879,14 @@ function brainDraw(ts){
     ctx.fillStyle=g; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,7); ctx.fill();
     ctx.strokeStyle=n.type==="group"?"#0A84FF":(dark?"rgba(0,0,0,.5)":"rgba(255,255,255,.9)");
     ctx.lineWidth=n.type==="group"?2:1.2; ctx.stroke();
-    if(n.type==="person"&&r>7){ ctx.fillStyle="#fff"; ctx.font=`600 ${Math.round(r*.9)}px -apple-system,sans-serif`; ctx.fillText(priv?"•":n.label[0],p.x,p.y+.5); }
+    if(n.type==="person"&&r>=7){ ctx.fillStyle="#fff"; ctx.font=`600 ${Math.round(r*.9)}px -apple-system,sans-serif`; ctx.fillText(priv?"•":n.label[0],p.x,p.y+.5); }
     const near=p.s>0.5;
     if(near||n.type==="group"||(n.type==="task"&&n.sig==="red"&&p.s>0.6)){
       let txt=priv?"•••":n.label;
       const lim=p.s>1.05?13:9; if(txt.length>lim) txt=txt.slice(0,lim-1)+"…";
       const fs=Math.max(9.5,Math.min(13,11*Math.min(1.25,p.s+.25)));
       ctx.font=`${n.type==="task"?500:600} ${fs.toFixed(1)}px -apple-system,sans-serif`;
-      const w=ctx.measureText(txt).width, ly=p.y+r+fs*.85;
+      const w=ctx.measureText(txt).width, ly=p.y+r+fs*.75;
       if(fits(p.x,ly,w+10,fs+6)){
         ctx.globalAlpha=Math.min(1,dep+.15);
         ctx.lineWidth=3; ctx.strokeStyle=halo; ctx.strokeText(txt,p.x,ly);
