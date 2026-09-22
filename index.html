@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Work Brain 모바일 v3.1.13</title>
+<title>Work Brain 모바일 v3.1.15</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -260,10 +260,70 @@ body.space .wb-mark,:root[data-theme="dark"] .wb-mark{background:rgba(255,196,0,
 .mtodo-edit-save{color:var(--blue);font-weight:700;background:rgba(10,132,255,.10)}
 </style>
 
+
+<style id="wb-mobile-todo-card-v315">
+.todo-mobile{
+  padding:10px 0 11px;
+}
+.todo-mobile-main{
+  display:block!important;
+  min-width:0;
+}
+.todo-mobile-main .ck{
+  width:100%;
+  min-width:0;
+}
+.todo-mobile-main .ck>input{
+  flex:0 0 17px;
+}
+.mtodo-text{
+  display:block!important;
+  flex:1 1 auto!important;
+  min-width:0!important;
+}
+.mtodo-head{
+  width:100%;
+  min-width:0;
+}
+.mtodo-head>span:first-child{
+  flex:1 1 auto;
+  min-width:0;
+  word-break:keep-all;
+  overflow-wrap:anywhere;
+  white-space:normal;
+  line-height:1.48;
+}
+.todo-mobile-due{
+  justify-content:flex-end;
+  margin:7px 0 0 28px!important;
+  padding-left:0!important;
+  min-width:0;
+}
+.todo-mobile-date{
+  position:absolute!important;
+  width:1px!important;height:1px!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+.mtodo-due-btn{
+  height:27px;
+  padding:0 9px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:rgba(127,127,127,.055);
+  color:var(--sub);
+  font-size:.72rem;
+}
+:root[data-theme="dark"] .mtodo-due-btn{
+  background:rgba(255,255,255,.045);
+  color:#929AAF;
+}
+</style>
+
 </head>
 <body>
 <header class="glass">
-  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v3.1.13</span></span><span class="sync" id="sync">연결 중…</span></div>
+  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v3.1.15</span></span><span class="sync" id="sync">연결 중…</span></div>
   <div class="hbtns" style="grid-template-columns:repeat(4,1fr)">
     <button class="tbtn on" data-tab="brain">뇌</button>
     <button class="tbtn" data-tab="home">오늘</button>
@@ -489,9 +549,19 @@ function mobileTodoHTML(t,i){
   const di=itemDueInfo(i);
   return `<div class="todo-mobile ${i.doneAt?"done":""}${di?` due-${di.cls}`:""}" data-todo="${t.id}|${i.id}">
     <div class="todo-mobile-main">
-      <label class="ck ${i.doneAt?"done":""}"><input type="checkbox" data-item="${t.id}|${i.id}" ${i.doneAt?"checked":""}><span class="mtodo-text"><span class="mtodo-head"><span>${esc(i.text)}</span><button type="button" class="mtodo-edit" data-medititem="${t.id}|${i.id}" aria-label="할 일 수정">✎</button></span>${i.doneAt?`<br><span class="d">완료 ${fmt(i.doneAt)}</span>`:""}</span></label>
+      <label class="ck ${i.doneAt?"done":""}">
+        <input type="checkbox" data-item="${t.id}|${i.id}" ${i.doneAt?"checked":""}>
+        <span class="mtodo-text">
+          <span class="mtodo-head"><span>${esc(i.text)}</span><button type="button" class="mtodo-edit" data-medititem="${t.id}|${i.id}" aria-label="할 일 수정">✎</button></span>
+          ${i.doneAt?`<span class="d">완료 ${fmt(i.doneAt)}</span>`:""}
+        </span>
+      </label>
     </div>
-    <div class="todo-mobile-due">${itemDuePill(i)}<input class="todo-mobile-date" type="date" data-itemdue="${t.id}|${i.id}" value="${itemDueValue(i)}" aria-label="${esc(i.text)} 기한"></div>
+    <div class="todo-mobile-due">
+      ${di?itemDuePill(i):'<span class="todo-pill far">기한 없음</span>'}
+      <button type="button" class="mtodo-due-btn" data-mpickdue="${t.id}|${i.id}">${di?"기한 변경":"기한 설정"}</button>
+      <input class="todo-mobile-date" type="date" data-itemdue="${t.id}|${i.id}" value="${itemDueValue(i)}" aria-label="${esc(i.text)} 기한">
+    </div>
   </div>`;
 }
 function mobileBeginTodoEdit(btn){
@@ -828,7 +898,12 @@ function render(){
   $("braintip").classList.toggle("on",brainOn);
   document.body.classList.toggle("brain-view",brainOn);
   syncMobileOmni();
-  if(brainOn){ v.innerHTML=""; brainSync(); return; }
+  if(brainOn){
+    v.innerHTML="";
+    brainSync();
+    B.fit=Math.max(B.fit||0,10);
+    return;
+  }
   v.innerHTML = tab==="home"?homeHTML() : tab==="list"?listHTML() : moreHTML();
   bind();
 }
@@ -968,6 +1043,14 @@ function taskSheet(id){
     if(ev.key==="Enter"&&!ev.isComposing){ev.preventDefault();mobileSaveTodoEdit(inp.dataset.mediting,inp.value);}
     if(ev.key==="Escape"){ev.preventDefault();taskSheet(id);}
   }));
+  $("sheet").querySelectorAll("[data-mpickdue]").forEach(b=>b.addEventListener("click",ev=>{
+    ev.preventDefault(); ev.stopPropagation();
+    const input=b.parentElement&&b.parentElement.querySelector("[data-itemdue]");
+    if(input){
+      try{ if(typeof input.showPicker==="function") input.showPicker(); else input.click(); }
+      catch(_){ input.focus(); input.click(); }
+    }
+  }));
   $("sheet").querySelectorAll("[data-itemdue]").forEach(d=>d.addEventListener("change",async()=>{
     const [tid,iid]=d.dataset.itemdue.split("|"), tt=byId(tid), it=tt&&(tt.items||[]).find(x=>x.id===iid);
     if(!it) return;
@@ -1059,7 +1142,7 @@ async function exportData(){
   catch{ openSheet(`<p class="say">내보내기</p><textarea class="f" rows="10">${esc(data)}</textarea><div class="acts"><button class="btn" data-close="1">닫기</button></div>`); }
 }
 /* ---------- 뇌(3D 그래프) ---------- */
-const B={cv:null,ctx:null,W:0,H:0,dpr:1,nodes:[],links:[],rx:-.35,ry:.6,dist:820,tdist:820,zoom:1,tzoom:1,auto:true,ptr:null,fit:0,rep:1800,len:150,sel:null};
+const B={cv:null,ctx:null,W:0,H:0,dpr:1,nodes:[],links:[],rx:-.35,ry:.6,dist:820,tdist:820,zoom:1,tzoom:1,auto:true,ptr:null,fit:0,rep:1800,len:150,sel:null,cx:0,cy:0,cz:0,tcx:0,tcy:0,tcz:0};
 const wrapBrainAngle=a=>{ const t=Math.PI*2; a=(a+Math.PI)%t; if(a<0)a+=t; return a-Math.PI; };
 const SIGC={red:"#FF3B30",yellow:"#FFC400",green:"#34C759",wait:"#AEAEB2",done:"#D1D1D6"};
 const themePref=()=>localStorage.getItem("wb_theme")||"auto";
@@ -1089,8 +1172,16 @@ function glow(ctx,x,y,r,col,k){ const g=ctx.createRadialGradient(x,y,0,x,y,r*3.4
   ctx.globalCompositeOperation="lighter"; const a=ctx.globalAlpha; ctx.globalAlpha=a*k; ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r*3.4,0,7); ctx.fill(); ctx.globalAlpha=a; ctx.globalCompositeOperation="source-over"; }
 function brainInit(){
   B.cv=$("brain"); B.ctx=B.cv.getContext("2d");
-  const rs=()=>{ B.dpr=Math.min(3,devicePixelRatio||1); B.W=innerWidth; B.H=innerHeight; B.cv.width=Math.round(B.W*B.dpr); B.cv.height=Math.round(B.H*B.dpr); B.cv.style.width=B.W+"px"; B.cv.style.height=B.H+"px"; };
-  rs(); addEventListener("resize",rs); addEventListener("orientationchange",()=>setTimeout(rs,300));
+  const rs=()=>{
+    B.dpr=Math.min(3,devicePixelRatio||1);
+    B.W=innerWidth; B.H=innerHeight;
+    B.cv.width=Math.round(B.W*B.dpr); B.cv.height=Math.round(B.H*B.dpr);
+    B.cv.style.width=B.W+"px"; B.cv.style.height=B.H+"px";
+    if(B.nodes.length) B.fit=12;
+  };
+  rs();
+  addEventListener("resize",rs);
+  addEventListener("orientationchange",()=>setTimeout(()=>{rs();B.fit=6;},320));
   const down=(x,y)=>{ B.ptr={x,y,m:0,n:brainHit(x,y)}; B.auto=false; };
   const move=(x,y)=>{ if(!B.ptr) return; const dx=x-B.ptr.x, dy=y-B.ptr.y;
     B.ptr.m+=Math.abs(dx)+Math.abs(dy); B.ptr.x=x; B.ptr.y=y;
@@ -1113,16 +1204,23 @@ function brainInit(){
   B.cv.addEventListener("touchmove",e=>{ if(e.touches.length===2&&d0){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
     B.tzoom=Math.max(.3,Math.min(3.5,z0*d/d0)); } },{passive:true});
   B.cv.addEventListener("wheel",e=>{ e.preventDefault(); B.tzoom=Math.max(.3,Math.min(3.5,B.tzoom*Math.exp(-e.deltaY*0.0014))); },{passive:false});
-  B.cv.addEventListener("dblclick",()=>{ B.rx=-.35; B.ry=.6; B.auto=true; brainFit(); });
+  B.cv.addEventListener("dblclick",()=>{
+    B.rx=-.35; B.ry=.6; B.auto=true;
+    brainFit(true);
+  });
   requestAnimationFrame(brainLoop);
 }
 /* 3D → 화면 좌표 */
 function proj(n){
+  const px=(n.x||0)-B.cx, py=(n.y||0)-B.cy, pz=(n.z||0)-B.cz;
   const cx=Math.cos(B.rx),sx=Math.sin(B.rx),cy=Math.cos(B.ry),sy=Math.sin(B.ry);
-  const x1=n.x*cy-n.z*sy, z1=n.x*sy+n.z*cy;
-  const y1=n.y*cx-z1*sx, z2=n.y*sx+z1*cx;
-  const s=820/(820+z2+280)*B.zoom;
-  const viewY=B.H/2+10;
+  const x1=px*cy-pz*sy, z1=px*sy+pz*cy;
+  const y1=py*cx-z1*sx, z2=py*sx+z1*cx;
+  const perspective=Math.max(.34,Math.min(2.2,820/(820+z2+280)));
+  const s=perspective*B.zoom;
+  const topSafe=Math.min(160,Math.max(118,B.H*.16));
+  const bottomSafe=Math.min(125,Math.max(88,B.H*.12));
+  const viewY=topSafe+(B.H-topSafe-bottomSafe)/2;
   return {x:B.W/2+x1*s, y:viewY+y1*s, s, z:z2};
 }
 function brainHit(x,y){
@@ -1179,7 +1277,10 @@ function brainSync(){
   const beltR=galaxyR+165;ung.sort((a,b)=>a.label.localeCompare(b.label)).forEach((n,i)=>{const a=-Math.PI/2+Math.PI*2*i/Math.max(1,ung.length),jit=((H(n.id)%25)-12);n.tx=Math.cos(a)*(beltR+jit);n.ty=Math.sin(a)*(beltR+jit);n.tz=((i%4)-1.5)*22;n.cluster="asteroid-belt";});
   for(const n of taskNodes){const ps=[...(taskPeople.get(n.tid)||[])].map(p=>seen.get("p:"+p)).filter(Boolean);if(ps.length){const ax=ps.reduce((s,p)=>s+(p.tx||0),0)/ps.length,ay=ps.reduce((s,p)=>s+(p.ty||0),0)/ps.length,w=ps.length>=2?.20:.08;n.tx=n.tx*(1-w)+ax*w;n.ty=n.ty*(1-w)+ay*w;}if(broadcastTasks.has(n.tid)&&all){n.tx=n.tx*.92+all.tx*.08;n.ty=n.ty*.92+all.ty*.08;}}
   for(const n of nodes){if(n.tx===undefined){n.tx=0;n.ty=0;n.tz=0;}if(n.fresh||!Number.isFinite(n.x)||!Number.isFinite(n.y)){n.x=n.tx+(Math.random()-.5)*14;n.y=n.ty+(Math.random()-.5)*14;n.z=(n.tz||0)+(Math.random()-.5)*10;n.vx=n.vy=n.vz=0;}n.fresh=false;}
-  const open=tasks.filter(t=>!t.isGroup&&t.status!=="완료"),red=open.filter(t=>signalOf(t).code==="red").length;$("braintip").textContent=`★ 사람 · ● 업무 행성 · 작은 점은 할 일 위성${red?` · 긴급 ${red}`:""}`;
+  const open=tasks.filter(t=>!t.isGroup&&t.status!=="완료"),red=open.filter(t=>signalOf(t).code==="red").length;
+  $("braintip").textContent=`★ 사람 · ● 업무 행성 · 작은 점은 할 일 위성${red?` · 긴급 ${red}`:""} · 두 번 탭 원위치`;
+  // 모바일에서는 데이터가 바뀔 때마다 몇 프레임 안정화 후 전체 천체를 다시 화면에 맞춘다.
+  B.fit=Math.max(B.fit||0,18);
 }
 function brainStep(ts){
   const N=B.nodes;
@@ -1225,7 +1326,11 @@ function brainStep(ts){
   }
 }
 function brainDraw(ts){
-  const ctx=B.ctx,dark=darkMode();B.zoom+=(B.tzoom-B.zoom)*.12;if(B.auto)B.ry+=0.00055;ctx.setTransform(B.dpr,0,0,B.dpr,0,0);ctx.clearRect(0,0,B.W,B.H);if(dark)spaceBack(ctx,ts);
+  const ctx=B.ctx,dark=darkMode();
+  B.zoom+=(B.tzoom-B.zoom)*.12;
+  B.cx+=(B.tcx-B.cx)*.12; B.cy+=(B.tcy-B.cy)*.12; B.cz+=(B.tcz-B.cz)*.12;
+  if(B.auto)B.ry=wrapBrainAngle(B.ry+0.00055);
+  ctx.setTransform(B.dpr,0,0,B.dpr,0,0);ctx.clearRect(0,0,B.W,B.H);if(dark)spaceBack(ctx,ts);
   const P=new Map(B.nodes.map(n=>[n,proj(n)])),halo=dark?"rgba(11,11,15,.9)":"rgba(255,255,255,.92)",inkC=dark?"#EDEDF2":"#1D1D1F",perC=dark?"#E0BEFF":"#6B2E91";
   const sel=B.sel&&B.nodes.find(n=>n.id===B.sel),hi=sel?new Set([sel.id,...(sel.nb||[])]):null;
   for(const n of B.nodes.filter(x=>x.type==="group"&&x.cosmic==="galaxy")){const p=P.get(n);if(p)brainGalaxy(ctx,n,p,Math.max(.5,p.s),dark,ts,hi&&!hi.has(n.id));}
@@ -1240,16 +1345,48 @@ function brainDraw(ts){
   }
   ctx.globalAlpha=1;
 }
-function brainFit(){
+function brainFit(immediate=false){
   if(!B.nodes.length) return;
-  let m=1; for(const n of B.nodes) m=Math.max(m,Math.hypot(n.x,n.y,n.z));
-  B.tzoom=Math.max(.3,Math.min(2.4,(Math.min(B.W,B.H)*0.55)/m));
+
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity,minZ=Infinity,maxZ=-Infinity;
+  for(const n of B.nodes){
+    const x=Number.isFinite(n.x)?n.x:(n.tx||0);
+    const y=Number.isFinite(n.y)?n.y:(n.ty||0);
+    const z=Number.isFinite(n.z)?n.z:(n.tz||0);
+    minX=Math.min(minX,x); maxX=Math.max(maxX,x);
+    minY=Math.min(minY,y); maxY=Math.max(maxY,y);
+    minZ=Math.min(minZ,z); maxZ=Math.max(maxZ,z);
+  }
+
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2, cz=(minZ+maxZ)/2;
+  B.tcx=cx; B.tcy=cy; B.tcz=cz;
+
+  let radius=1;
+  for(const n of B.nodes){
+    const x=(Number.isFinite(n.x)?n.x:(n.tx||0))-cx;
+    const y=(Number.isFinite(n.y)?n.y:(n.ty||0))-cy;
+    const z=(Number.isFinite(n.z)?n.z:(n.tz||0))-cz;
+    radius=Math.max(radius,Math.hypot(x,y,z)+(n.r||8)*2.2);
+  }
+
+  // 헤더와 하단 입력창을 제외한 실제 가시 영역에 맞춘다.
+  const topSafe=Math.min(160,Math.max(118,B.H*.16));
+  const bottomSafe=Math.min(125,Math.max(88,B.H*.12));
+  const usableW=Math.max(220,B.W-34);
+  const usableH=Math.max(260,B.H-topSafe-bottomSafe-24);
+  const fitScale=Math.min(usableW,usableH)*0.43/radius;
+
+  B.tzoom=Math.max(.34,Math.min(1.65,fitScale));
+  if(immediate){
+    B.cx=B.tcx; B.cy=B.tcy; B.cz=B.tcz;
+    B.zoom=B.tzoom;
+  }
 }
 function brainLoop(ts){
   requestAnimationFrame(brainLoop);
   if(document.hidden||!$("brain").classList.contains("on")) return;
   brainStep(ts); brainDraw(ts);
-  if(B.fit&&--B.fit===0) brainFit();
+  if(B.fit&&--B.fit===0) brainFit(B.zoom===1&&B.cx===0&&B.cy===0&&B.cz===0);
 }
 /* ---------- 브리핑 읽어주기 ---------- */
 function briefText(){
