@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Work Brain 모바일 v3.1.20</title>
+<title>Work Brain 모바일 v3.1.23</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -493,7 +493,7 @@ body.space .wb-mark,:root[data-theme="dark"] .wb-mark{background:rgba(255,196,0,
 </head>
 <body>
 <header class="glass">
-  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v3.1.20</span></span><span class="sync" id="sync">연결 중…</span></div>
+  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v3.1.23</span></span><span class="sync" id="sync">연결 중…</span></div>
   <div class="hbtns" style="grid-template-columns:repeat(4,1fr)">
     <button class="tbtn on" data-tab="brain">뇌</button>
     <button class="tbtn" data-tab="home">오늘</button>
@@ -904,6 +904,60 @@ function unpack(r){
   state.syncMeta={...(state.syncMeta||{}),...(r.meta||{})};
   return {nt,ne};
 }
+
+function brainGraphOutOfDate(){
+  if(!B||!Array.isArray(B.nodes)) return true;
+  const graphIds=new Set(
+    B.nodes
+      .filter(n=>n&&(n.type==="task"||n.type==="group")&&n.tid)
+      .map(n=>n.tid)
+  );
+  if(graphIds.size!==tasks.length) return true;
+  for(const t of tasks) if(!graphIds.has(t.id)) return true;
+  return false;
+}
+
+function snapBrainNodesToLayout(){
+  if(!B||!Array.isArray(B.nodes)) return;
+  for(const n of B.nodes){
+    if(Number.isFinite(n.tx)) n.x=n.tx;
+    if(Number.isFinite(n.ty)) n.y=n.ty;
+    if(Number.isFinite(n.tz)) n.z=n.tz;
+    n.vx=0; n.vy=0; n.vz=0;
+    n.fresh=false;
+  }
+}
+
+function rebuildBrainFromCurrentData(reason="sync"){
+  if(tab!=="brain" || !B || !B.cv) return;
+
+  // 기존 force 상태를 버리고 현재 tasks/entries만으로 우주를 다시 만든다.
+  B.nodes=[];
+  B.links=[];
+  B.ptr=null;
+  B.vrx=0; B.vry=0;
+  B.dragging=false;
+  B.auto=true;
+  B.invisibleFrames=0;
+  B.taskInvisibleFrames=0;
+  B.lastRecoveryAt=0;
+  B.lastTaskRecoveryAt=0;
+
+  brainSync();
+  snapBrainNodesToLayout();
+
+  // 브라우저가 레이아웃/캔버스 크기를 반영한 다음 다시 한 번 확정한다.
+  requestAnimationFrame(()=>{
+    brainFit(true);
+    B.fit=0;
+    B.lastRecoveryAt=performance.now();
+    requestAnimationFrame(()=>{
+      snapBrainNodesToLayout();
+      brainFit(true);
+    });
+  });
+}
+
 async function syncNow(silent){
   if(!GH||syncing){ return; }
   syncing=true; $("sync").textContent="동기화 중…";
@@ -911,14 +965,54 @@ async function syncNow(silent){
     for(let i=0;i<2;i++){
       const got=await ghGet();
       const n=got.data?unpack(got.data):{nt:0,ne:0};
+
+      // unpack 직후 전역 state에도 최신 배열 참조를 즉시 반영한다.
+      state.tasks=tasks;
+      state.entries=entries;
+      state.people=people;
+
       const newSha=await ghPut(packUp(),got.sha);
-      if(newSha!==null){ sha=newSha; state.lastSync=Date.now();
-        try{ localStorage.setItem(LS,JSON.stringify({...state,tasks,entries,people})); }catch{}
-        if(!silent) toast(n.nt||n.ne?`동기화 완료 · 새 업무 ${n.nt}건, 새 기록 ${n.ne}건`:"동기화 완료");
-        render(); break; }
+      if(newSha!==null){
+        sha=newSha;
+        state.lastSync=Date.now();
+
+        try{
+          localStorage.setItem(LS,JSON.stringify({...state,tasks,entries,people}));
+        }catch{}
+
+        const remoteChanged=!!(n.nt||n.ne);
+        const needsBrainRebuild=tab==="brain" && (remoteChanged || !silent || brainGraphOutOfDate());
+
+        // 일반 UI는 최신 데이터로 먼저 다시 그린다.
+        render();
+
+        // 우주 탭에서는 render()의 일반 brainSync만 믿지 않고,
+        // 동기화 직후 최신 데이터 기준으로 force 그래프를 한 번 더 강제 재구축한다.
+        if(needsBrainRebuild){
+          rebuildBrainFromCurrentData(remoteChanged?"remote-change":"manual-sync");
+        }
+
+        if(!silent){
+          const graphCount=B&&Array.isArray(B.nodes)
+            ? B.nodes.filter(x=>x.type==="task"||x.type==="group").length
+            : 0;
+          toast(
+            remoteChanged
+              ? `동기화 완료 · 업무 반영 ${n.nt}건 · 기록 ${n.ne}건`
+              : `동기화 완료${tab==="brain"?` · 우주 업무 ${graphCount}개 재확인`:""}`
+          );
+        }
+        break;
+      }
     }
-  }catch(e){ if(!silent) toast(e.message||"동기화 실패"); $("sync").textContent="동기화 오류"; syncing=false; return; }
-  syncing=false; syncNote();
+  }catch(e){
+    if(!silent) toast(e.message||"동기화 실패");
+    $("sync").textContent="동기화 오류";
+    syncing=false;
+    return;
+  }
+  syncing=false;
+  syncNote();
 }
 function schedulePush(){ if(!GH) return; dirtySince=Date.now(); clearTimeout(pushTimer); pushTimer=setTimeout(()=>syncNow(true),2000); }
 let dirtySince=0;
@@ -1071,6 +1165,11 @@ function render(){
     v.innerHTML="";
     brainSync();
     B.fit=Math.max(B.fit||0,10);
+
+    // 데이터가 있는데 그래프에 누락된 업무가 있으면 바로 재구축 예약.
+    if(tasks.length && brainGraphOutOfDate()){
+      requestAnimationFrame(()=>rebuildBrainFromCurrentData("render-mismatch"));
+    }
     return;
   }
   v.innerHTML = tab==="home"?homeHTML() : tab==="list"?listHTML() : moreHTML();
@@ -1316,7 +1415,9 @@ const B={
   rx:-.35,ry:.6,dist:820,tdist:820,zoom:1,tzoom:1,auto:true,
   ptr:null,fit:0,rep:1800,len:150,sel:null,
   cx:0,cy:0,cz:0,tcx:0,tcy:0,tcz:0,
-  vrx:0,vry:0,dragging:false,lastMoveAt:0
+  vrx:0,vry:0,dragging:false,lastMoveAt:0,
+  invisibleFrames:0,lastRecoveryAt:0,
+  taskInvisibleFrames:0,lastTaskRecoveryAt:0
 };
 const wrapBrainAngle=a=>{ const t=Math.PI*2; a=(a+Math.PI)%t; if(a<0)a+=t; return a-Math.PI; };
 const SIGC={red:"#FF3B30",yellow:"#FFC400",green:"#34C759",wait:"#AEAEB2",done:"#D1D1D6"};
@@ -1413,10 +1514,7 @@ function brainInit(){
   B.cv.addEventListener("touchmove",e=>{ if(e.touches.length===2&&d0){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
     B.tzoom=Math.max(.3,Math.min(3.5,z0*d/d0)); } },{passive:true});
   B.cv.addEventListener("wheel",e=>{ e.preventDefault(); B.tzoom=Math.max(.3,Math.min(3.5,B.tzoom*Math.exp(-e.deltaY*0.0014))); },{passive:false});
-  B.cv.addEventListener("dblclick",()=>{
-    B.rx=-.35; B.ry=.6; B.vrx=0; B.vry=0; B.dragging=false; B.auto=true;
-    brainFit(true);
-  });
+  B.cv.addEventListener("dblclick",()=>{ brainRecoverTaskStars("double-tap"); });
   requestAnimationFrame(brainLoop);
 }
 /* 3D → 화면 좌표 */
@@ -1487,9 +1585,24 @@ function brainSync(){
   for(const n of taskNodes){const ps=[...(taskPeople.get(n.tid)||[])].map(p=>seen.get("p:"+p)).filter(Boolean);if(ps.length){const ax=ps.reduce((s,p)=>s+(p.tx||0),0)/ps.length,ay=ps.reduce((s,p)=>s+(p.ty||0),0)/ps.length,w=ps.length>=2?.20:.08;n.tx=n.tx*(1-w)+ax*w;n.ty=n.ty*(1-w)+ay*w;}if(broadcastTasks.has(n.tid)&&all){n.tx=n.tx*.92+all.tx*.08;n.ty=n.ty*.92+all.ty*.08;}}
   for(const n of nodes){if(n.tx===undefined){n.tx=0;n.ty=0;n.tz=0;}if(n.fresh||!Number.isFinite(n.x)||!Number.isFinite(n.y)){n.x=n.tx+(Math.random()-.5)*14;n.y=n.ty+(Math.random()-.5)*14;n.z=(n.tz||0)+(Math.random()-.5)*10;n.vx=n.vy=n.vz=0;}n.fresh=false;}
   const open=tasks.filter(t=>!t.isGroup&&t.status!=="완료"),red=open.filter(t=>signalOf(t).code==="red").length;
-  $("braintip").textContent=`★ 사람 · ● 업무 행성 · 드래그 후 관성 회전${red?` · 긴급 ${red}`:""} · 두 번 탭 원위치`;
+  $("braintip").textContent=`★ 사람 · ● 업무 별/행성 · 드래그 후 관성 회전${red?` · 긴급 ${red}`:""} · 업무 ${taskNodes.length}/${tasks.length} · 두 번 탭 원위치`;
   // 모바일에서는 데이터가 바뀔 때마다 몇 프레임 안정화 후 전체 천체를 다시 화면에 맞춘다.
   B.fit=Math.max(B.fit||0,18);
+  // 새 데이터가 들어온 직후에는 정상 배치 좌표 기준으로 카메라를 다시 잡는다.
+  if(!B.lastRecoveryAt) setTimeout(()=>brainRecoverView("initial-sync"),80);
+
+  // 업무 데이터가 있는데 화면상 업무 별이 사라지는 경우를 대비해
+  // 초기 렌더 직후 한 번 강제 정렬/fit을 예약한다.
+  if(taskNodes.length){
+    setTimeout(()=>{
+      if(tab!=="brain") return;
+      const visible=taskNodes.filter(n=>{
+        const p=proj(n), r=Math.max(2.6,n.r*p.s*1.3);
+        return p.x>=-50&&p.y>=-50&&p.x<=B.W+50&&p.y<=B.H+50&&r>=1.5;
+      }).length;
+      if(visible===0) brainRecoverTaskStars("post-sync-task-check");
+    },180);
+  }
 }
 function brainStep(ts){
   const N=B.nodes;
@@ -1532,6 +1645,21 @@ function brainStep(ts){
     n.vx+=(tx-n.x)*k;n.vy+=(ty-n.y)*k;n.vz+=(tz-n.z)*k*.70;
     n.vx*=.80;n.vy*=.80;n.vz*=.80;
     n.x+=n.vx;n.y+=n.vy;n.z+=n.vz;
+
+    // 모바일에서 force 계산이 튀어 전체 우주가 화면 밖으로 사라지지 않도록 안전 반경 제한
+    const bx=n.tx||0, by=n.ty||0, bz=n.tz||0;
+    const dx=n.x-bx, dy=n.y-by, dz=n.z-bz;
+    const drift=Math.hypot(dx,dy,dz);
+    const maxDrift=n.cosmic==="galaxy"?44:n.cosmic==="system"?38:n.cosmic==="subsystem"?34:n.cosmic==="star"?32:30;
+    if(!Number.isFinite(drift) || drift>maxDrift){
+      if(Number.isFinite(drift) && drift>0){
+        const k=maxDrift/drift;
+        n.x=bx+dx*k; n.y=by+dy*k; n.z=bz+dz*k;
+      }else{
+        n.x=bx; n.y=by; n.z=bz;
+      }
+      n.vx*=.22; n.vy*=.22; n.vz*=.22;
+    }
   }
 }
 function brainDraw(ts){
@@ -1555,8 +1683,11 @@ function brainDraw(ts){
   const sel=B.sel&&B.nodes.find(n=>n.id===B.sel),hi=sel?new Set([sel.id,...(sel.nb||[])]):null;
   for(const n of B.nodes.filter(x=>x.type==="group"&&x.cosmic==="galaxy")){const p=P.get(n);if(p)brainGalaxy(ctx,n,p,Math.max(.5,p.s),dark,ts,hi&&!hi.has(n.id));}
   for(const l of B.links){const a=P.get(l.s),b=P.get(l.t);if(!a||!b)continue;const dep=Math.max(.12,Math.min(1,(a.s+b.s)/2)),on=hi&&hi.has(l.s.id)&&hi.has(l.t.id),tree=l.k==="tree",collab=l.k==="collab",broadcast=l.k==="broadcast",wiki=l.k==="wiki";let al=tree?.20:collab?.07:broadcast?.06:wiki?.05:.03;if(hi)al=on?(tree?.78:collab?.72:broadcast?.64:wiki?.66:.50):.012;ctx.globalAlpha=dep*al;ctx.strokeStyle=tree?"#76AAFF":collab?"#BE96FF":broadcast?"#DEB0FF":wiki?"#AF52DE":(dark?"#8E95AB":"#9A9AA0");ctx.lineWidth=(tree?1.5:collab?1.05:.8)*dep;if(wiki||broadcast)ctx.setLineDash(wiki?[5,4]:[3,4]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);}
-  ctx.globalAlpha=1;const order=[...B.nodes].sort((a,b)=>P.get(b).z-P.get(a).z),priv=document.body.classList.contains("privacy"),boxes=[];const fits=(x,y,w,h)=>{for(const b of boxes)if(Math.abs(x-b.x)*2<(w+b.w)&&Math.abs(y-b.y)*2<(h+b.h))return false;boxes.push({x,y,w,h});return true;};ctx.textAlign="center";ctx.textBaseline="middle";
-  for(const n of order){const p=P.get(n),r=Math.max(2.6,n.r*p.s*1.3);if(p.x<-70||p.y<-70||p.x>B.W+70||p.y>B.H+70||r<1.5)continue;const dep=Math.max(.25,Math.min(1,p.s*1.15)),dim=hi&&!hi.has(n.id);ctx.globalAlpha=dim?.16:dep;
+  ctx.globalAlpha=1;
+  let visibleNodeCount=0, visibleTaskCount=0;
+  const totalTaskCount=B.nodes.filter(n=>n.type==="task").length;
+  const order=[...B.nodes].sort((a,b)=>P.get(b).z-P.get(a).z),priv=document.body.classList.contains("privacy"),boxes=[];const fits=(x,y,w,h)=>{for(const b of boxes)if(Math.abs(x-b.x)*2<(w+b.w)&&Math.abs(y-b.y)*2<(h+b.h))return false;boxes.push({x,y,w,h});return true;};ctx.textAlign="center";ctx.textBaseline="middle";
+  for(const n of order){const p=P.get(n),r=Math.max(2.6,n.r*p.s*1.3);if(p.x<-70||p.y<-70||p.x>B.W+70||p.y>B.H+70||r<1.5)continue;visibleNodeCount++;if(n.type==="task")visibleTaskCount++;const dep=Math.max(.25,Math.min(1,p.s*1.15)),dim=hi&&!hi.has(n.id);ctx.globalAlpha=dim?.16:dep;
     if(n.type==="task"){const t=n.t||byId(n.tid),base=SIGC[n.sig]||"#0A84FF",body=r*.84;if(n.asteroid){ctx.fillStyle=base;ctx.beginPath();for(let k=0;k<7;k++){const a=k*Math.PI*2/7+n.ph,rr=body*(.62+((k*37)%10)/35),xx=p.x+Math.cos(a)*rr,yy=p.y+Math.sin(a)*rr;k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);}ctx.closePath();ctx.fill();}else{if(dark)glow(ctx,p.x,p.y,r,base,n.sig==="red"?1.0:.65);const g=ctx.createRadialGradient(p.x-r*.28,p.y-r*.3,r*.12,p.x,p.y,r);g.addColorStop(0,"rgba(255,255,255,.58)");g.addColorStop(.42,base);g.addColorStop(1,base);ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,body,0,Math.PI*2);ctx.fill();if(n.shared)brainShared(ctx,p.x,p.y,body,dark,dim);if(t){drawBrainLife(ctx,p.x,p.y,r,t,ts,n.ph,dark);brainMoons(ctx,p.x,p.y,body,t,ts,n.ph,dark,dim,sel===n);}}}
     else if(n.type==="group"){if(n.cosmic==="galaxy"){const c=cRgb(n.galaxyColor);ctx.fillStyle=dark?"#F4FAFF":"#FFF";ctx.shadowColor=`rgba(${c.r},${c.g},${c.b},.6)`;ctx.shadowBlur=dark?6:1;ctx.beginPath();ctx.arc(p.x,p.y,Math.max(5,r*.54),0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle=`rgba(${c.r},${c.g},${c.b},.5)`;ctx.lineWidth=.7;ctx.beginPath();ctx.ellipse(p.x,p.y,r*1.18,r*.58,-.35,0,Math.PI*2);ctx.stroke();}else brainSystem(ctx,p.x,p.y,r,n.galaxyColor,dark,dim,n.lv);}
     else if(n.type==="person")brainStar(ctx,p.x,p.y,r,!!n.owner,!!n.all,dark,dim);
@@ -1564,15 +1695,96 @@ function brainDraw(ts){
     const near=p.s>.52;if(near||n.type==="group"||n.type==="person"||(n.type==="task"&&n.sig==="red"&&p.s>.6)||sel===n){let txt=n.all?"전체 직원 성단":(priv?"•••":n.label);const lim=p.s>1.05?13:9;if(txt.length>lim)txt=txt.slice(0,lim-1)+"…";const fs=Math.max(9.2,Math.min(12.5,10.8*Math.min(1.25,p.s+.25)));ctx.font=`${n.type==="task"?500:600} ${fs.toFixed(1)}px -apple-system,sans-serif`;const w=ctx.measureText(txt).width,ly=p.y+r+fs*.75;if(fits(p.x,ly,w+10,fs+6)){ctx.globalAlpha=Math.min(1,dep+.15);ctx.lineWidth=3;ctx.strokeStyle=halo;ctx.strokeText(txt,p.x,ly);ctx.fillStyle=n.type==="person"?perC:inkC;ctx.fillText(txt,p.x,ly);}}
   }
   ctx.globalAlpha=1;
+
+  // 핵심: 사람/분류 천체가 보여도 '업무 별'이 하나도 안 보이면 별도 오류로 판단한다.
+  if(totalTaskCount>0){
+    if(visibleTaskCount===0){
+      B.taskInvisibleFrames=(B.taskInvisibleFrames||0)+1;
+      const now=performance.now();
+      if(B.taskInvisibleFrames>10 && now-(B.lastTaskRecoveryAt||0)>1800){
+        brainRecoverTaskStars("no-visible-task-stars");
+      }
+    }else{
+      B.taskInvisibleFrames=0;
+    }
+  }else{
+    B.taskInvisibleFrames=0;
+  }
+
+  // 전체 천체가 사라진 경우의 기존 안전장치도 유지.
+  if(B.nodes.length){
+    if(visibleNodeCount===0){
+      B.invisibleFrames=(B.invisibleFrames||0)+1;
+      const now=performance.now();
+      if(B.invisibleFrames>18 && now-(B.lastRecoveryAt||0)>2200){
+        brainRecoverView("visibility-guard");
+      }
+    }else{
+      B.invisibleFrames=0;
+    }
+  }
 }
+function brainRecoverTaskStars(reason="task-visibility"){
+  if(!B.nodes.length) return;
+
+  // 업무 별/행성이 모두 사라진 경우에는 부분 보정이 아니라
+  // 모든 천체를 정상 배치 좌표로 즉시 되돌려 화면 구성을 확정한다.
+  for(const n of B.nodes){
+    const tx=Number.isFinite(n.tx)?n.tx:0;
+    const ty=Number.isFinite(n.ty)?n.ty:0;
+    const tz=Number.isFinite(n.tz)?n.tz:0;
+    n.x=tx; n.y=ty; n.z=tz;
+    n.vx=0; n.vy=0; n.vz=0;
+  }
+
+  B.rx=-.35; B.ry=.6;
+  B.vrx=0; B.vry=0;
+  B.dragging=false;
+  B.auto=true;
+
+  // 중심/배율도 즉시 target 배치에 맞춘다.
+  brainFit(true);
+  B.zoom=Math.max(B.zoom,.52);
+  B.tzoom=Math.max(B.tzoom,.52);
+
+  B.taskInvisibleFrames=0;
+  B.invisibleFrames=0;
+  B.lastTaskRecoveryAt=performance.now();
+  B.lastRecoveryAt=B.lastTaskRecoveryAt;
+}
+
+function brainRecoverView(reason="auto"){
+  if(!B.nodes.length) return;
+
+  // 물리좌표가 튀었더라도 정상 배치 기준(tx/ty/tz) 근처로 즉시 되돌린다.
+  for(const n of B.nodes){
+    const tx=Number.isFinite(n.tx)?n.tx:0;
+    const ty=Number.isFinite(n.ty)?n.ty:0;
+    const tz=Number.isFinite(n.tz)?n.tz:0;
+    if(!Number.isFinite(n.x)||!Number.isFinite(n.y)||!Number.isFinite(n.z) ||
+       Math.hypot((n.x||0)-tx,(n.y||0)-ty,(n.z||0)-tz)>220){
+      n.x=tx; n.y=ty; n.z=tz;
+      n.vx=0; n.vy=0; n.vz=0;
+    }
+  }
+
+  B.rx=-.35; B.ry=.6;
+  B.vrx=0; B.vry=0;
+  B.dragging=false; B.auto=true;
+  brainFit(true);
+  B.invisibleFrames=0;
+  B.lastRecoveryAt=performance.now();
+}
+
 function brainFit(immediate=false){
   if(!B.nodes.length) return;
 
+  // 카메라 fit은 물리 시뮬레이션 좌표가 아니라 안정적인 배치 기준 좌표(tx/ty/tz)를 사용한다.
   let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity,minZ=Infinity,maxZ=-Infinity;
   for(const n of B.nodes){
-    const x=Number.isFinite(n.x)?n.x:(n.tx||0);
-    const y=Number.isFinite(n.y)?n.y:(n.ty||0);
-    const z=Number.isFinite(n.z)?n.z:(n.tz||0);
+    const x=Number.isFinite(n.tx)?n.tx:0;
+    const y=Number.isFinite(n.ty)?n.ty:0;
+    const z=Number.isFinite(n.tz)?n.tz:0;
     minX=Math.min(minX,x); maxX=Math.max(maxX,x);
     minY=Math.min(minY,y); maxY=Math.max(maxY,y);
     minZ=Math.min(minZ,z); maxZ=Math.max(maxZ,z);
@@ -1581,22 +1793,28 @@ function brainFit(immediate=false){
   const cx=(minX+maxX)/2, cy=(minY+maxY)/2, cz=(minZ+maxZ)/2;
   B.tcx=cx; B.tcy=cy; B.tcz=cz;
 
-  let radius=1;
+  // 3D 반경 하나로 fit하면 z축 때문에 지나치게 축소될 수 있어 화면 투영에 중요한 XY 반경을 우선 사용한다.
+  let radiusXY=1, radiusZ=1;
   for(const n of B.nodes){
-    const x=(Number.isFinite(n.x)?n.x:(n.tx||0))-cx;
-    const y=(Number.isFinite(n.y)?n.y:(n.ty||0))-cy;
-    const z=(Number.isFinite(n.z)?n.z:(n.tz||0))-cz;
-    radius=Math.max(radius,Math.hypot(x,y,z)+(n.r||8)*2.2);
+    const x=(Number.isFinite(n.tx)?n.tx:0)-cx;
+    const y=(Number.isFinite(n.ty)?n.ty:0)-cy;
+    const z=(Number.isFinite(n.tz)?n.tz:0)-cz;
+    radiusXY=Math.max(radiusXY,Math.hypot(x,y)+(n.r||8)*2.4);
+    radiusZ=Math.max(radiusZ,Math.abs(z)+(n.r||8)*1.5);
   }
 
-  // 헤더와 하단 입력창을 제외한 실제 가시 영역에 맞춘다.
   const topSafe=Math.min(160,Math.max(118,B.H*.16));
   const bottomSafe=Math.min(125,Math.max(88,B.H*.12));
-  const usableW=Math.max(220,B.W-34);
-  const usableH=Math.max(260,B.H-topSafe-bottomSafe-24);
-  const fitScale=Math.min(usableW,usableH)*0.43/radius;
+  const usableW=Math.max(230,B.W-28);
+  const usableH=Math.max(280,B.H-topSafe-bottomSafe-20);
 
-  B.tzoom=Math.max(.34,Math.min(1.65,fitScale));
+  const fitX=(usableW*.45)/radiusXY;
+  const fitY=(usableH*.45)/radiusXY;
+  let fitScale=Math.min(fitX,fitY);
+
+  // 너무 작아져 천체가 점처럼 사라지는 걸 방지
+  B.tzoom=Math.max(.48,Math.min(1.75,fitScale));
+
   if(immediate){
     B.cx=B.tcx; B.cy=B.tcy; B.cz=B.tcz;
     B.zoom=B.tzoom;
@@ -1606,7 +1824,10 @@ function brainLoop(ts){
   requestAnimationFrame(brainLoop);
   if(document.hidden||!$("brain").classList.contains("on")) return;
   brainStep(ts); brainDraw(ts);
-  if(B.fit&&--B.fit===0) brainFit(B.zoom===1&&B.cx===0&&B.cy===0&&B.cz===0);
+  if(B.fit&&--B.fit===0){
+    const first=B.zoom===1&&B.cx===0&&B.cy===0&&B.cz===0;
+    brainFit(first);
+  }
 }
 /* ---------- 브리핑 읽어주기 ---------- */
 function briefText(){
