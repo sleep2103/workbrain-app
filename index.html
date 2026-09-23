@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Work Brain 모바일 v3.4.1</title>
+<title>Work Brain 모바일 v3.5.0</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -435,6 +435,7 @@ body.space .wb-mark,:root[data-theme="dark"] .wb-mark{background:rgba(255,196,0,
 .mtodo-detail{grid-column:1/-1;margin:4px 0 6px 24px;max-width:100%;overflow:hidden}
 .mtodo-memo{width:100%;box-sizing:border-box;font-size:.82rem;line-height:1.5;padding:6px 8px;border-radius:8px;resize:vertical;min-height:40px;max-height:150px}
 .mtodo-files{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.mtodo-file.dl{background:rgba(10,132,255,.1);color:var(--blue);border-color:rgba(10,132,255,.25)}
 .mtodo-file{font-size:.7rem;border:1px solid var(--line);border-radius:6px;padding:2px 6px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .todo-mobile-row{
   display:grid!important;
@@ -499,7 +500,7 @@ body.space .wb-mark,:root[data-theme="dark"] .wb-mark{background:rgba(255,196,0,
 </head>
 <body>
 <header class="glass">
-  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v3.4.1</span></span><span class="sync" id="sync">연결 중…</span></div>
+  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v3.5.0</span></span><span class="sync" id="sync">연결 중…</span></div>
   <div class="hbtns" style="grid-template-columns:repeat(4,1fr)">
     <button class="tbtn on" data-tab="brain">뇌</button>
     <button class="tbtn" data-tab="home">오늘</button>
@@ -740,7 +741,9 @@ function mobileTodoHTML(t,i){
     </div>
     ${mtodoOpen.has(i.id)?`<div class="mtodo-detail">
       <textarea class="mtodo-memo" data-mmemo="${t.id}|${i.id}" rows="2" placeholder="이 할 일 메모 (자동 저장)">${esc(i.memo||"")}</textarea>
-      ${(i.files||[]).length?`<div class="mtodo-files">${(i.files||[]).map(f=>`<span class="mtodo-file">${esc(f.name)}</span>`).join("")}</div><p class="d" style="margin:4px 0 0">자료 원본은 PC 에서 볼 수 있습니다.</p>`:`<p class="d" style="margin:4px 0 0">자료 넣기는 PC 에서 됩니다.</p>`}
+      ${(i.files||[]).length?`<div class="mtodo-files">${(i.files||[]).map(f=>f.gh
+          ?`<button type="button" class="mtodo-file dl" data-mfile="${esc(f.gh)}|${esc(f.name)}">⤓ ${esc(f.name)}</button>`
+          :`<span class="mtodo-file">${esc(f.name)}${f.ghFail?" · PC에만 있음":" · 올리는 중"}</span>`).join("")}</div>`:`<p class="d" style="margin:4px 0 0">자료 넣기는 PC 에서 됩니다.</p>`}
     </div>`:""}
   </div>`;
 }
@@ -1364,10 +1367,18 @@ function taskSheet(id){
     wk.addEventListener("input",()=>{ clearTimeout(wtm); wtm=setTimeout(()=>saveWiki(true),1200); });
     const wb=$("sheet").querySelector("[data-wiki]"); if(wb) wb.onclick=()=>saveWiki(false);
   }
+  $("sheet").querySelectorAll("[data-item]").forEach(c=>{
+    c.onchange=null;
+    c.addEventListener("change",()=>toggleItem(c.dataset.item,c.checked));
+  });
   $("sheet").querySelectorAll("[data-mnote]").forEach(b=>b.onclick=()=>{
     const [tid,iid]=b.dataset.mnote.split("|");
     if(mtodoOpen.has(iid)) mtodoOpen.delete(iid); else mtodoOpen.add(iid);
     taskSheet(tid);
+  });
+  $("sheet").querySelectorAll("[data-mfile]").forEach(b=>b.onclick=()=>{
+    const [path,name]=b.dataset.mfile.split("|");
+    downloadRepoFile(path,name,b);
   });
   let mmTimer=null;
   $("sheet").querySelectorAll("[data-mmemo]").forEach(ta=>{
@@ -2092,6 +2103,23 @@ function todoList(){
   const g=grams(todoP.text);
   const sc=open.map(t=>({t,s:dice(g,grams(t.title))})).filter(x=>x.s>=.18).sort((a,b)=>b.s-a.s).map(x=>x.t);
   return [...new Set([...sc,...open.sort((a,b)=>lastAt(b)-lastAt(a))])].slice(0,8);
+}
+async function downloadRepoFile(path,name,btn){
+  if(!GH){ toast("먼저 [더보기 > 기기 간 동기화]를 연결하세요."); return; }
+  const old=btn?btn.textContent:"";
+  if(btn){ btn.disabled=true; btn.textContent="받는 중…"; }
+  try{
+    const r=await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${path}?ref=${GH.branch||"main"}`,
+      {headers:{...ghHeaders(),Accept:"application/vnd.github.raw"},cache:"no-store"});
+    if(!r.ok) throw new Error(r.status===404?"저장소에 파일이 없습니다. PC 에서 동기화를 한 번 돌려 주세요.":`받지 못했습니다 (${r.status})`);
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download=name; a.rel="noopener";
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },4000);
+    toast("파일 앱에 저장했습니다.");
+  }catch(e){ toast(e.message||"받지 못했습니다."); }
+  if(btn){ btn.disabled=false; btn.textContent=old; }
 }
 function todoChips(){
   return (todoList().map(x=>`<button class="chip ${todoP.taskId===x.id?"sel":""}" data-tdt="${x.id}">${esc(x.title)}</button>`).join("")||'<span class="d">찾는 업무가 없습니다.</span>')

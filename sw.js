@@ -1,6 +1,6 @@
 /* Work Brain 모바일: 화면(앱 껍데기)만 저장해 두어 오프라인에서도 열리게 한다.
    기록은 저장하지 않으며, GitHub 요청은 항상 네트워크로 나간다. */
-const CACHE = "workbrain-shell-v3.4.1";
+const CACHE = "workbrain-shell-v3.5.0";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()).catch(() => self.skipWaiting()));
