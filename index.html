@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Work Brain 모바일 v3.1.23</title>
+<title>Work Brain 모바일 v3.1.25</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -493,7 +493,7 @@ body.space .wb-mark,:root[data-theme="dark"] .wb-mark{background:rgba(255,196,0,
 </head>
 <body>
 <header class="glass">
-  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v3.1.23</span></span><span class="sync" id="sync">연결 중…</span></div>
+  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v3.1.25</span></span><span class="sync" id="sync">연결 중…</span></div>
   <div class="hbtns" style="grid-template-columns:repeat(4,1fr)">
     <button class="tbtn on" data-tab="brain">뇌</button>
     <button class="tbtn" data-tab="home">오늘</button>
@@ -1446,6 +1446,90 @@ function spaceBack(ctx,ts){
 }
 function glow(ctx,x,y,r,col,k){ const g=ctx.createRadialGradient(x,y,0,x,y,r*3.4); g.addColorStop(0,col+"cc"); g.addColorStop(.25,col+"55"); g.addColorStop(1,col+"00");
   ctx.globalCompositeOperation="lighter"; const a=ctx.globalAlpha; ctx.globalAlpha=a*k; ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r*3.4,0,7); ctx.fill(); ctx.globalAlpha=a; ctx.globalCompositeOperation="source-over"; }
+
+/* ---------- 모바일 천체 렌더러 ----------
+   배경을 그린 뒤 호출되던 천체 렌더 함수 정의가 누락되어
+   ReferenceError로 프레임이 중단되던 문제를 복구한다. ---------- */
+function cRgb(hex){
+  const h=String(hex||"#6EA8FF").replace("#","").trim();
+  const s=h.length===3?h.split("").map(x=>x+x).join(""):h.padEnd(6,"0").slice(0,6);
+  const n=parseInt(s,16);
+  if(!Number.isFinite(n)) return {r:110,g:168,b:255};
+  return {r:(n>>16)&255,g:(n>>8)&255,b:n&255};
+}
+function brainGalaxy(ctx,n,p,scale,dark,ts,dim){
+  const c=cRgb(n.galaxyColor||"#6EA8FF");
+  const R=Math.max(28,(n.zoneR||90)*scale);
+  ctx.save();ctx.globalAlpha=dim?.16:1;ctx.translate(p.x,p.y);
+  ctx.rotate((n.ph||0)*.35+ts*.000006);
+  const g=ctx.createRadialGradient(0,0,0,0,0,R);
+  g.addColorStop(0,`rgba(${c.r},${c.g},${c.b},${dark?.16:.09})`);
+  g.addColorStop(.42,`rgba(${c.r},${c.g},${c.b},${dark?.075:.045})`);
+  g.addColorStop(1,`rgba(${c.r},${c.g},${c.b},0)`);
+  ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(0,0,R,R*.50,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=`rgba(${c.r},${c.g},${c.b},${dark?.19:.11})`;ctx.lineWidth=.8;
+  for(let i=0;i<2;i++){ctx.beginPath();ctx.ellipse(0,0,R*(.48+i*.18),R*(.18+i*.08),i*.45,0,Math.PI*2);ctx.stroke();}
+  ctx.restore();
+}
+function brainStar(ctx,x,y,r,owner,all,dark,dim){
+  ctx.save();ctx.globalAlpha=dim?.17:1;
+  if(all){
+    ctx.strokeStyle=dark?"rgba(207,184,255,.48)":"rgba(142,99,215,.35)";
+    ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.beginPath();ctx.arc(x,y,r+4,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+    const pts=[[-.42,-.18],[.32,-.36],[.46,.24],[-.08,.45],[-.45,.28]];
+    for(let i=0;i<pts.length;i++){const px=x+pts[i][0]*r*1.35,py=y+pts[i][1]*r*1.35;ctx.fillStyle=i===0?"#FFFFFF":"#C79AFF";if(dark){ctx.shadowColor="#B86BFF";ctx.shadowBlur=4;}ctx.beginPath();ctx.arc(px,py,Math.max(1.3,r*.14),0,Math.PI*2);ctx.fill();}
+    ctx.shadowBlur=0;ctx.restore();return;
+  }
+  const col=owner?"#F7E7A8":"#C792FF";
+  if(dark){ctx.shadowColor=owner?"rgba(255,224,128,.75)":"rgba(184,107,255,.70)";ctx.shadowBlur=owner?14:9;}
+  ctx.strokeStyle=owner?"rgba(255,235,164,.62)":"rgba(221,184,255,.52)";ctx.lineWidth=.7;
+  for(let i=0;i<4;i++){const a=i*Math.PI/2;ctx.beginPath();ctx.moveTo(x+Math.cos(a)*r*.72,y+Math.sin(a)*r*.72);ctx.lineTo(x+Math.cos(a)*r*1.45,y+Math.sin(a)*r*1.45);ctx.stroke();}
+  const g=ctx.createRadialGradient(x-r*.25,y-r*.3,r*.08,x,y,r);
+  g.addColorStop(0,"#FFFFFF");g.addColorStop(.28,owner?"#FFF2B8":"#F1D8FF");g.addColorStop(1,col);
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r*.72,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.restore();
+}
+function brainSystem(ctx,x,y,r,col,dark,dim,level=1){
+  const c=cRgb(col||"#6EA8FF"),major=level<=1;
+  ctx.save();ctx.globalAlpha=dim?.17:1;
+  ctx.strokeStyle=`rgba(${c.r},${c.g},${c.b},${dark?(major?.48:.34):(major?.30:.22)})`;ctx.lineWidth=major?1.05:.85;
+  ctx.beginPath();ctx.ellipse(x,y,r*(major?1.20:1.08),r*(major?.63:.55),-.35,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.ellipse(x,y,r*(major?.92:.80),r*(major?.45:.39),.55,0,Math.PI*2);ctx.stroke();
+  const core=r*(major?.55:.43);
+  const g=ctx.createRadialGradient(x-r*.20,y-r*.25,r*.05,x,y,core);
+  g.addColorStop(0,"#FFFFFF");g.addColorStop(.24,"rgba(247,251,255,.98)");g.addColorStop(.55,`rgba(${c.r},${c.g},${c.b},.94)`);g.addColorStop(1,`rgba(${c.r},${c.g},${c.b},.28)`);
+  ctx.fillStyle=g;if(dark){ctx.shadowColor=`rgba(${c.r},${c.g},${c.b},${major?.65:.48})`;ctx.shadowBlur=major?8:5;}
+  ctx.beginPath();ctx.arc(x,y,core,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.restore();
+}
+function brainShared(ctx,x,y,r,dark,dim){
+  ctx.save();ctx.globalAlpha=dim?.10:(dark?.24:.18);ctx.strokeStyle=dark?"#B88CFF":"#8A5FC7";
+  ctx.lineWidth=.8;ctx.setLineDash([2,3]);ctx.beginPath();ctx.ellipse(x,y,r+5,(r+5)*.58,.55,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);ctx.restore();
+}
+function drawBrainLife(ctx,x,y,r,t,ts,ph,dark){
+  const lf=lifeOf(t);if(!lf.total||!lf.done)return;
+  const ratio=Math.max(0,Math.min(1,lf.ratio));if(ratio<=0)return;
+  const bodyR=r*.82,start=-Math.PI/2,end=start+Math.PI*2*ratio;
+  ctx.save();ctx.lineCap="round";
+  const grad=ctx.createLinearGradient(x-bodyR,y-bodyR,x+bodyR,y+bodyR);
+  grad.addColorStop(0,"rgba(52,215,199,.92)");grad.addColorStop(.5,"rgba(103,211,255,.98)");grad.addColorStop(1,"rgba(78,143,255,.92)");
+  ctx.strokeStyle=grad;ctx.lineWidth=Math.max(.8,Math.min(1.4,bodyR*.05));
+  if(dark){ctx.shadowColor="rgba(86,196,255,.55)";ctx.shadowBlur=3;}
+  ctx.beginPath();ctx.arc(x,y,bodyR+.8,start,end);ctx.stroke();ctx.shadowBlur=0;ctx.restore();
+}
+function brainMoons(ctx,x,y,bodyR,t,ts,ph,dark,dim,selected){
+  const items=(t&&t.items)||[];if(!items.length)return;
+  const shown=items.slice(0,selected?8:5),orbit=bodyR+Math.max(4.5,bodyR*.23);
+  ctx.save();ctx.globalAlpha=dim?.12:1;
+  ctx.strokeStyle=dark?"rgba(180,205,235,.075)":"rgba(80,100,130,.08)";ctx.lineWidth=.55;ctx.beginPath();ctx.arc(x,y,orbit,0,Math.PI*2);ctx.stroke();
+  shown.forEach((it,i)=>{
+    const a=ph+i*Math.PI*2/shown.length+ts*.000045,px=x+Math.cos(a)*orbit,py=y+Math.sin(a)*orbit;
+    const done=!!it.doneAt,di=itemDueInfo(it);let col=dark?"#9CA4B8":"#A6A9B0",glowC="transparent";
+    if(done){col=dark?"#7EDCF5":"#39AFC8";glowC="rgba(91,214,240,.65)";}
+    else if(di){if(di.cls==="over"||di.cls==="now"){col="#FF5B52";glowC="rgba(255,59,48,.55)";}else if(di.cls==="soon"){col="#FF815F";glowC="rgba(255,90,55,.35)";}else if(di.cls==="watch"){col="#FFB04D";glowC="rgba(255,149,0,.25)";}}
+    ctx.fillStyle=col;ctx.shadowColor=glowC;ctx.shadowBlur=(done&&dark)||(di&&["over","now","soon"].includes(di.cls))?2.5:0;
+    ctx.beginPath();ctx.arc(px,py,done?1.45:1.2,0,Math.PI*2);ctx.fill();
+  });
+  ctx.shadowBlur=0;ctx.restore();
+}
 function brainInit(){
   B.cv=$("brain"); B.ctx=B.cv.getContext("2d");
   const rs=()=>{
@@ -1583,9 +1667,33 @@ function brainSync(){
   for(const [pgid,arr] of tasksByParent){arr.sort((a,b)=>(a.t.createdAt||0)-(b.t.createdAt||0)||a.label.localeCompare(b.label));const pg=taskMap.get(pgid),rg=rootGroup(pg),gn=groupById.get(pgid),rn=rg&&groupById.get(rg.id),base=gn||rn||{tx:0,ty:0,tz:0};let outward=Math.atan2(base.ty||0,base.tx||0);const ppg=pg&&parentGroup(pg),ppn=ppg&&groupById.get(ppg.id);if(ppn)outward=Math.atan2((base.ty||0)-(ppn.ty||0),(base.tx||0)-(ppn.tx||0));arr.forEach((n,idx)=>{const ring=Math.floor(idx/6),pos=idx%6,remain=arr.length-ring*6,ringCount=Math.min(6,remain),spread=Math.PI*1.30,angle=outward+(ringCount===1?0:(pos-(ringCount-1)/2)*(spread/(ringCount-1))),rr=(pg&&pg.isGroup&&gl(pg)===0?76:66)+ring*46;n.tx=(base.tx||0)+Math.cos(angle)*rr;n.ty=(base.ty||0)+Math.sin(angle)*rr;n.tz=(base.tz||0)+((pos%3)-1)*17+ring*8;n.galaxyColor=rn?.galaxyColor||"#6EA8FF";n.cluster="galaxy:"+(rg?rg.id:pgid);});}
   const beltR=galaxyR+165;ung.sort((a,b)=>a.label.localeCompare(b.label)).forEach((n,i)=>{const a=-Math.PI/2+Math.PI*2*i/Math.max(1,ung.length),jit=((H(n.id)%25)-12);n.tx=Math.cos(a)*(beltR+jit);n.ty=Math.sin(a)*(beltR+jit);n.tz=((i%4)-1.5)*22;n.cluster="asteroid-belt";});
   for(const n of taskNodes){const ps=[...(taskPeople.get(n.tid)||[])].map(p=>seen.get("p:"+p)).filter(Boolean);if(ps.length){const ax=ps.reduce((s,p)=>s+(p.tx||0),0)/ps.length,ay=ps.reduce((s,p)=>s+(p.ty||0),0)/ps.length,w=ps.length>=2?.20:.08;n.tx=n.tx*(1-w)+ax*w;n.ty=n.ty*(1-w)+ay*w;}if(broadcastTasks.has(n.tid)&&all){n.tx=n.tx*.92+all.tx*.08;n.ty=n.ty*.92+all.ty*.08;}}
-  for(const n of nodes){if(n.tx===undefined){n.tx=0;n.ty=0;n.tz=0;}if(n.fresh||!Number.isFinite(n.x)||!Number.isFinite(n.y)){n.x=n.tx+(Math.random()-.5)*14;n.y=n.ty+(Math.random()-.5)*14;n.z=(n.tz||0)+(Math.random()-.5)*10;n.vx=n.vy=n.vz=0;}n.fresh=false;}
+
+  // 모바일에서는 데스크톱 규모의 우주 좌표를 그대로 쓰면 전체맞춤 과정에서
+  // 행성 자체가 2~3px까지 축소된다. 좌표계를 압축해 카메라 zoom을 확보한다.
+  const mobileLayoutScale=Math.max(.50,Math.min(.64,(B.W||390)/720));
+  for(const n of nodes){
+    if(n.tx===undefined){n.tx=0;n.ty=0;n.tz=0;}
+    n.tx*=mobileLayoutScale;
+    n.ty*=mobileLayoutScale;
+    n.tz*=Math.max(.62,mobileLayoutScale+.10);
+
+    if(n.fresh||!Number.isFinite(n.x)||!Number.isFinite(n.y)){
+      n.x=n.tx+(Math.random()-.5)*8;
+      n.y=n.ty+(Math.random()-.5)*8;
+      n.z=(n.tz||0)+(Math.random()-.5)*6;
+      n.vx=n.vy=n.vz=0;
+    }else{
+      // 버전 교체 직후 기존 좌표가 이전 대형 좌표계에 남아 있지 않게 정규화
+      const d=Math.hypot(n.x-n.tx,n.y-n.ty,n.z-(n.tz||0));
+      if(!Number.isFinite(d)||d>180){
+        n.x=n.tx;n.y=n.ty;n.z=n.tz||0;
+        n.vx=n.vy=n.vz=0;
+      }
+    }
+    n.fresh=false;
+  }
   const open=tasks.filter(t=>!t.isGroup&&t.status!=="완료"),red=open.filter(t=>signalOf(t).code==="red").length;
-  $("braintip").textContent=`★ 사람 · ● 업무 별/행성 · 드래그 후 관성 회전${red?` · 긴급 ${red}`:""} · 업무 ${taskNodes.length}/${tasks.length} · 두 번 탭 원위치`;
+  $("braintip").textContent=`★ 사람 · ● 업무 별/행성 · 드래그 후 관성 회전${red?` · 긴급 ${red}`:""} · 업무 별 ${taskNodes.length} · 분류 ${groupNodes.length} · 두 번 탭 원위치`;
   // 모바일에서는 데이터가 바뀔 때마다 몇 프레임 안정화 후 전체 천체를 다시 화면에 맞춘다.
   B.fit=Math.max(B.fit||0,18);
   // 새 데이터가 들어온 직후에는 정상 배치 좌표 기준으로 카메라를 다시 잡는다.
@@ -1597,8 +1705,8 @@ function brainSync(){
     setTimeout(()=>{
       if(tab!=="brain") return;
       const visible=taskNodes.filter(n=>{
-        const p=proj(n), r=Math.max(2.6,n.r*p.s*1.3);
-        return p.x>=-50&&p.y>=-50&&p.x<=B.W+50&&p.y<=B.H+50&&r>=1.5;
+        const p=proj(n), r=Math.max(n.sig==="red"?6.4:5.4,n.r*p.s*1.3);
+        return p.x>=-50&&p.y>=-50&&p.x<=B.W+50&&p.y<=B.H+50&&r>=3;
       }).length;
       if(visible===0) brainRecoverTaskStars("post-sync-task-check");
     },180);
@@ -1687,12 +1795,18 @@ function brainDraw(ts){
   let visibleNodeCount=0, visibleTaskCount=0;
   const totalTaskCount=B.nodes.filter(n=>n.type==="task").length;
   const order=[...B.nodes].sort((a,b)=>P.get(b).z-P.get(a).z),priv=document.body.classList.contains("privacy"),boxes=[];const fits=(x,y,w,h)=>{for(const b of boxes)if(Math.abs(x-b.x)*2<(w+b.w)&&Math.abs(y-b.y)*2<(h+b.h))return false;boxes.push({x,y,w,h});return true;};ctx.textAlign="center";ctx.textBaseline="middle";
-  for(const n of order){const p=P.get(n),r=Math.max(2.6,n.r*p.s*1.3);if(p.x<-70||p.y<-70||p.x>B.W+70||p.y>B.H+70||r<1.5)continue;visibleNodeCount++;if(n.type==="task")visibleTaskCount++;const dep=Math.max(.25,Math.min(1,p.s*1.15)),dim=hi&&!hi.has(n.id);ctx.globalAlpha=dim?.16:dep;
+  for(const n of order){
+    const p=P.get(n);
+    const natural=n.r*p.s*1.3;
+    const minR=n.type==="task"?(n.sig==="red"?6.4:5.4):(n.type==="group"?4.2:4.0);
+    const r=Math.max(minR,natural);
+    if(p.x<-70||p.y<-70||p.x>B.W+70||p.y>B.H+70||r<1.5)continue;
+    visibleNodeCount++;if(n.type==="task")visibleTaskCount++;const dep=Math.max(.25,Math.min(1,p.s*1.15)),dim=hi&&!hi.has(n.id);ctx.globalAlpha=dim?.16:dep;
     if(n.type==="task"){const t=n.t||byId(n.tid),base=SIGC[n.sig]||"#0A84FF",body=r*.84;if(n.asteroid){ctx.fillStyle=base;ctx.beginPath();for(let k=0;k<7;k++){const a=k*Math.PI*2/7+n.ph,rr=body*(.62+((k*37)%10)/35),xx=p.x+Math.cos(a)*rr,yy=p.y+Math.sin(a)*rr;k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);}ctx.closePath();ctx.fill();}else{if(dark)glow(ctx,p.x,p.y,r,base,n.sig==="red"?1.0:.65);const g=ctx.createRadialGradient(p.x-r*.28,p.y-r*.3,r*.12,p.x,p.y,r);g.addColorStop(0,"rgba(255,255,255,.58)");g.addColorStop(.42,base);g.addColorStop(1,base);ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,body,0,Math.PI*2);ctx.fill();if(n.shared)brainShared(ctx,p.x,p.y,body,dark,dim);if(t){drawBrainLife(ctx,p.x,p.y,r,t,ts,n.ph,dark);brainMoons(ctx,p.x,p.y,body,t,ts,n.ph,dark,dim,sel===n);}}}
     else if(n.type==="group"){if(n.cosmic==="galaxy"){const c=cRgb(n.galaxyColor);ctx.fillStyle=dark?"#F4FAFF":"#FFF";ctx.shadowColor=`rgba(${c.r},${c.g},${c.b},.6)`;ctx.shadowBlur=dark?6:1;ctx.beginPath();ctx.arc(p.x,p.y,Math.max(5,r*.54),0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle=`rgba(${c.r},${c.g},${c.b},.5)`;ctx.lineWidth=.7;ctx.beginPath();ctx.ellipse(p.x,p.y,r*1.18,r*.58,-.35,0,Math.PI*2);ctx.stroke();}else brainSystem(ctx,p.x,p.y,r,n.galaxyColor,dark,dim,n.lv);}
     else if(n.type==="person")brainStar(ctx,p.x,p.y,r,!!n.owner,!!n.all,dark,dim);
     if(sel===n){ctx.strokeStyle=dark?"rgba(150,208,255,.86)":"#0A84FF";ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(p.x,p.y,r+5,0,Math.PI*2);ctx.stroke();}
-    const near=p.s>.52;if(near||n.type==="group"||n.type==="person"||(n.type==="task"&&n.sig==="red"&&p.s>.6)||sel===n){let txt=n.all?"전체 직원 성단":(priv?"•••":n.label);const lim=p.s>1.05?13:9;if(txt.length>lim)txt=txt.slice(0,lim-1)+"…";const fs=Math.max(9.2,Math.min(12.5,10.8*Math.min(1.25,p.s+.25)));ctx.font=`${n.type==="task"?500:600} ${fs.toFixed(1)}px -apple-system,sans-serif`;const w=ctx.measureText(txt).width,ly=p.y+r+fs*.75;if(fits(p.x,ly,w+10,fs+6)){ctx.globalAlpha=Math.min(1,dep+.15);ctx.lineWidth=3;ctx.strokeStyle=halo;ctx.strokeText(txt,p.x,ly);ctx.fillStyle=n.type==="person"?perC:inkC;ctx.fillText(txt,p.x,ly);}}
+    const near=n.type==="task"?p.s>.40:p.s>.52;if(near||n.type==="group"||n.type==="person"||(n.type==="task"&&n.sig==="red"&&p.s>.34)||sel===n){let txt=n.all?"전체 직원 성단":(priv?"•••":n.label);const lim=p.s>1.05?13:9;if(txt.length>lim)txt=txt.slice(0,lim-1)+"…";const fs=Math.max(9.2,Math.min(12.5,10.8*Math.min(1.25,p.s+.25)));ctx.font=`${n.type==="task"?500:600} ${fs.toFixed(1)}px -apple-system,sans-serif`;const w=ctx.measureText(txt).width,ly=p.y+r+fs*.75;if(fits(p.x,ly,w+10,fs+6)){ctx.globalAlpha=Math.min(1,dep+.15);ctx.lineWidth=3;ctx.strokeStyle=halo;ctx.strokeText(txt,p.x,ly);ctx.fillStyle=n.type==="person"?perC:inkC;ctx.fillText(txt,p.x,ly);}}
   }
   ctx.globalAlpha=1;
 
@@ -1744,8 +1858,8 @@ function brainRecoverTaskStars(reason="task-visibility"){
 
   // 중심/배율도 즉시 target 배치에 맞춘다.
   brainFit(true);
-  B.zoom=Math.max(B.zoom,.52);
-  B.tzoom=Math.max(B.tzoom,.52);
+  B.zoom=Math.max(B.zoom,.68);
+  B.tzoom=Math.max(B.tzoom,.68);
 
   B.taskInvisibleFrames=0;
   B.invisibleFrames=0;
@@ -1813,7 +1927,7 @@ function brainFit(immediate=false){
   let fitScale=Math.min(fitX,fitY);
 
   // 너무 작아져 천체가 점처럼 사라지는 걸 방지
-  B.tzoom=Math.max(.48,Math.min(1.75,fitScale));
+  B.tzoom=Math.max(.64,Math.min(2.10,fitScale));
 
   if(immediate){
     B.cx=B.tcx; B.cy=B.tcy; B.cz=B.tcz;
@@ -1823,10 +1937,22 @@ function brainFit(immediate=false){
 function brainLoop(ts){
   requestAnimationFrame(brainLoop);
   if(document.hidden||!$("brain").classList.contains("on")) return;
-  brainStep(ts); brainDraw(ts);
-  if(B.fit&&--B.fit===0){
-    const first=B.zoom===1&&B.cx===0&&B.cy===0&&B.cz===0;
-    brainFit(first);
+  try{
+    brainStep(ts);
+    brainDraw(ts);
+    if(B.fit&&--B.fit===0){
+      const first=B.zoom===1&&B.cx===0&&B.cy===0&&B.cz===0;
+      brainFit(first);
+    }
+    B.drawError="";
+  }catch(err){
+    const msg=(err&&err.message)?err.message:String(err);
+    if(B.drawError!==msg){
+      B.drawError=msg;
+      console.error("WorkBrain mobile renderer:",err);
+      const tip=$("braintip");
+      if(tip) tip.textContent=`⚠ 우주 렌더링 오류 · ${msg}`;
+    }
   }
 }
 /* ---------- 브리핑 읽어주기 ---------- */
