@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Work Brain 모바일 v3.5.0</title>
+<title>Work Brain 모바일 v3.6.2</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -430,6 +430,11 @@ body.space .wb-mark,:root[data-theme="dark"] .wb-mark{background:rgba(255,196,0,
   padding:6px 0!important;
   border-bottom:1px solid var(--line)!important;
 }
+.brief-play{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:10px 0 0;padding:13px 16px;border-radius:16px;
+  border:1px solid rgba(10,132,255,.35);background:linear-gradient(135deg,rgba(10,132,255,.16),rgba(175,82,222,.12));color:var(--ink)}
+.brief-play b{font-size:.98rem}
+.brief-play .d{font-size:.74rem}
+.bp-ico{flex:none;width:40px;height:40px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1rem}
 .mtodo-note{border:0;background:transparent;color:var(--faint);font-size:.8rem;padding:0 2px;line-height:1}
 .mtodo-note.has{color:var(--blue)}
 .mtodo-detail{grid-column:1/-1;margin:4px 0 6px 24px;max-width:100%;overflow:hidden}
@@ -500,7 +505,7 @@ body.space .wb-mark,:root[data-theme="dark"] .wb-mark{background:rgba(255,196,0,
 </head>
 <body>
 <header class="glass">
-  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v3.5.0</span></span><span class="sync" id="sync">연결 중…</span></div>
+  <div class="hrow"><span class="logo">WORK BRAIN <span style="letter-spacing:0;font-weight:500">v3.6.2</span></span><span class="sync" id="sync">연결 중…</span></div>
   <div class="hbtns" style="grid-template-columns:repeat(4,1fr)">
     <button class="tbtn on" data-tab="brain">뇌</button>
     <button class="tbtn" data-tab="home">오늘</button>
@@ -667,6 +672,7 @@ const lastAt=t=>{const es=entries.filter(e=>e.taskId===t.id);return es.length?Ma
 const openTasks=()=>tasks.filter(t=>!t.isGroup&&t.status!=="완료");
 function dueInfo(t){
   if(!t.due) return null;
+  if(t.dueHasTime){ const z=new Date(t.due); if(z.getHours()===0&&z.getMinutes()===0){ t.dueHasTime=false; } }
   const d=new Date(t.due), now=new Date(), diff=Math.round((sod(d)-sod(now))/864e5);
   const past=t.dueHasTime?d<now:diff<0;
   let tag="",cls="";
@@ -1136,7 +1142,12 @@ function readConfirm(){
   p.kind=$("cKind").value; p.from=$("cFrom").value.trim(); if($("cTo")) p.to=$("cTo").value.trim(); p.channel=$("cCh").value; p.evidence=$("cEv").value.trim();
   if($("cFb")) p.fb=$("cFb").value;
   if($("cOcc").value) p.occ=new Date($("cOcc").value).getTime();
-  p.due=$("cDue").value?{iso:new Date($("cDue").value).getTime(),hasTime:true}:null;
+  if($("cDue").value){
+    const v=$("cDue").value, d=new Date(v);
+    const noTime=/T00:00$/.test(v)&&!(p.due&&p.due.hasTime);
+    if(noTime) d.setHours(23,59,59,0);
+    p.due={iso:d.getTime(),hasTime:!noTime};
+  } else p.due=null;
 }
 async function applyPending(){
   readConfirm(); const p=pending;
@@ -1202,7 +1213,8 @@ function homeHTML(){
   const greet=h<11?"좋은 아침입니다":h<17?"안녕하세요":"저녁입니다";
   const sec=(title,list,fn)=>list.length?`<div class="sec">${title} ${list.length}</div>${list.slice(0,8).map(fn).join("")}`:"";
   const row=(t,extra)=>`<button class="trow" data-open="${t.id}">${lamp(t)}<span class="ttl">${esc(t.title)}</span><span class="d">${esc(extra||"")}</span><span class="tsub">${esc(signalOf(t).why)}</span></button>`;
-  return `<section class="card glass">
+  return `<button class="brief-play" id="briefPlay" type="button"><span class="bp-ico">${speaking?"■":"▶"}</span><span><b>${speaking?"브리핑 멈추기":"오늘 브리핑 듣기"}</b><br><span class="d">기한 · 내 차례 업무 · 남은 할 일을 읽어드립니다</span></span></button>
+  <section class="card glass">
     <p class="say">${greet}. ${over.length+today.length?`오늘 꼭 챙길 업무가 <b>${over.length+today.length}건</b>입니다.`:open.length?`급한 기한은 없습니다. 진행 중 ${open.length}건.`:"등록된 업무가 없습니다."}</p>
     ${sec("기한 지남",over,t=>row(t,dueInfo(t).text))}
     ${sec("오늘까지",today,t=>row(t,dueInfo(t).text))}
@@ -1415,6 +1427,7 @@ function taskSheet(id){
 function bind(){
   $("view").querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>taskSheet(b.dataset.open));
   $("view").querySelectorAll("[data-item]").forEach(c=>c.onchange=()=>toggleItem(c.dataset.item,c.checked));
+  const bp=$("briefPlay"); if(bp) bp.onclick=()=>{ if(speaking){ stopSpeak(); } else speakText(briefText()); render(); };
   const q=$("q"); if(q) q.oninput=e=>{ filter=e.target.value; const pos=e.target.selectionStart; render(); const n=$("q"); if(n){n.focus();n.setSelectionRange(pos,pos);} };
   $("view").querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{ const a=b.dataset.act;
     if(a==="import") importSheet(); else if(a==="export") exportData(); else if(a==="gh") ghSheet(); else if(a==="ask") askSheet(); else if(a==="period") periodSheet();
@@ -2011,12 +2024,133 @@ function briefText(){
   if(soon.length) L.push(`사흘 안에 기한이 오는 업무가 ${soon.length}건 있습니다.`);
   if(gaps.length) L.push(`확인이 필요한 업무가 ${gaps.length}건 있습니다. ${gaps.slice(0,2).map(t=>`${t.title}은 ${gapsOf(t)[0]}`).join(", ")}.`);
   if(waiting.length) L.push(`회신을 기다리는 보고가 ${waiting.length}건 있습니다.`);
-  if(items.length) L.push(`남은 할 일은 ${items.length}개입니다.`);
+  const mine=open.filter(t=>flowOf(t).stage.turn!=="상대"&&!over.includes(t)&&!today.includes(t)).sort((a,b)=>{const da=dueInfo(a),db=dueInfo(b);return (da?da.diff:99)-(db?db.diff:99);});
+  if(mine.length) L.push(`내 차례인 업무는 ${mine.slice(0,3).map(t=>t.title).join(", ")}${mine.length>3?` 외 ${mine.length-3}건`:""}입니다.`);
+  if(items.length){ const top=open.flatMap(t=>(t.items||[]).filter(i=>!i.doneAt).map(i=>i.text)).slice(0,3);
+    L.push(`남은 할 일은 ${items.length}개이고, 먼저 ${top.join(", ")}${items.length>3?" 등이":"이"} 있습니다.`); }
   if(L.length===1) L.push("급한 것은 없습니다.");
   return L.join(" ");
 }
 let speaking=false;
+/* ---------- 명령 알아듣기 (띄어쓰기·말투에 강하게) ---------- */
+function normCmd(v){ return String(v||"").replace(/[\s.,!?~。…·'"“”‘’]+/g,"").replace(/(해주세요|해주실래요|해줄래|해줘요|해주라|해줘|좀)$/,"해줘"); }
+const ASK_WORDS=/(해줘|알려줘|알려|보여줘|보여|읽어줘|읽어|말해줘|말해|불러줘|불러|정리해줘|요약해줘|뭐야|뭐있어|뭐지|뭐가있|있어|있나|어때)$/;
+function routeCommand(v){
+  const n=normCmd(v);
+  if(!n) return null;
+  if(/^(할일|todo)[:：]/i.test(String(v).trim())) return null;
+  // 새 기록처럼 보이는 문장(사람·기한·지시 표현)은 명령으로 보지 않는다
+  if(/(까지|하라고|지시|요청함|요청받|보고함|제출함|완료함|했음|함$)/.test(n)&&!/(브리핑|요약)/.test(n)) return null;
+  const ask=ASK_WORDS.test(n)||/[?？]\s*$/.test(String(v));
+  if(/(업무|일)?(정리|재분류|정돈)(좀)?(해줘|하기|해)?$/.test(n)&&/^(업무|일|전체)?(정리|재분류|정돈)/.test(n)) return {type:"tidy"};
+  if(/브리핑|요약/.test(n)&&(ask||/브리핑$|요약$/.test(n))) return {type:"brief",focus:/(해야할|남은|밀린|오늘)/.test(n)};
+  if(/(오늘|지금|이번주)?(뭐|무엇|무슨일)(부터)?해야(해|돼|되|하지|할까|하나)/.test(n)) return {type:"brief",focus:true};
+  if(/(할일|해야할일|해야할것|투두|체크리스트)/.test(n)&&ask) return {type:"todo"};
+  if(/(해야할업무|남은업무|밀린업무|진행중인업무|오늘업무|업무목록|업무현황|업무상황)/.test(n)&&ask) return {type:"brief",focus:true};
+  if(/(일정|상황|현황)(알려|보여|말해|브리핑)/.test(n)) return {type:"brief"};
+  return null;
+}
+
+/* ---------- 할 일 불러오기 (말로 묻기) ---------- */
+const TQ_RE=/(할\s*일|해야\s*할\s*(일|것)|투두|todo|체크\s*리스트)/i;
+const TQ_ASK=/(불러|보여|알려|찾아|꺼내|목록|리스트|뭐\s*(야|있|였|했)|뭐지|뭐가|어떤\s*거|정리해\s*줘|읽어|말해|\?|？)/;
+function isTodoQuery(v){ return TQ_RE.test(v)&&TQ_ASK.test(v)&&!/^\s*(할\s*일|todo)\s*[:：]/i.test(v); }
+function tqRange(v){
+  const now=new Date(), d0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const day=864e5, mon=(d0.getDay()+6)%7;
+  if(/오늘/.test(v)) return {from:+d0,to:+d0+day,label:"오늘"};
+  if(/어제/.test(v)) return {from:+d0-day,to:+d0,label:"어제"};
+  if(/이번\s*주|금주/.test(v)) return {from:+d0-mon*day,to:+d0+(7-mon)*day,label:"이번 주"};
+  if(/지난\s*주|저번\s*주/.test(v)) return {from:+d0-(mon+7)*day,to:+d0-mon*day,label:"지난주"};
+  if(/이번\s*달/.test(v)) return {from:+new Date(now.getFullYear(),now.getMonth(),1),to:+new Date(now.getFullYear(),now.getMonth()+1,1),label:"이번 달"};
+  if(/지난\s*달|저번\s*달/.test(v)) return {from:+new Date(now.getFullYear(),now.getMonth()-1,1),to:+new Date(now.getFullYear(),now.getMonth(),1),label:"지난달"};
+  const m=v.match(/최근\s*(\d{1,3})\s*일/); if(m) return {from:+d0-(+m[1]-1)*day,to:+d0+day,label:`최근 ${m[1]}일`};
+  return null;
+}
+function tqMode(v){
+  if(/(기한\s*(지난|넘은)|밀린|늦은|지연|못\s*한|놓친)/.test(v)) return "overdue";
+  if(/(지난|완료|끝낸|끝난|마친|체크한|한\s*일|했던|처리한)/.test(v)) return "done";
+  if(/(남은|안\s*한|미완료|해야\s*할|할\s*일\s*(목록|리스트)?\s*(불러|보여|알려))/.test(v)) return "open";
+  return "both";
+}
+function tqCollect(v){
+  const mode=tqMode(v), rng=tqRange(v), now=Date.now();
+  const all=[];
+  for(const t of tasks.filter(t=>!t.isGroup)) for(const it of (t.items||[])) all.push({t,it});
+  const dueMs=it=>it.due&&it.due.iso?+new Date(it.due.iso):null;
+  const inR=ms=>!rng||(ms!=null&&ms>=rng.from&&ms<rng.to);
+  const done=all.filter(x=>x.it.doneAt&&inR(x.it.doneAt)).sort((a,b)=>b.it.doneAt-a.it.doneAt);
+  const overdue=all.filter(x=>!x.it.doneAt&&dueMs(x.it)!=null&&dueMs(x.it)<now).sort((a,b)=>dueMs(a.it)-dueMs(b.it));
+  const open=all.filter(x=>!x.it.doneAt&&(!rng||inR(dueMs(x.it))||inR(x.it.createdAt))).sort((a,b)=>(dueMs(a.it)??9e15)-(dueMs(b.it)??9e15));
+  let sections;
+  if(mode==="done") sections=[["끝낸 할 일",done]].concat(rng?[]:[["기한이 지났는데 남은 할 일",overdue]]);
+  else if(mode==="overdue") sections=[["기한이 지났는데 남은 할 일",overdue]];
+  else if(mode==="open") sections=[["남은 할 일",open]];
+  else sections=[["남은 할 일",open],["끝낸 할 일",done.slice(0,30)]];
+  const head=`${rng?rng.label+" ":""}${({done:rng?"끝낸 할 일":"지난(끝낸) 할 일",overdue:"밀린 할 일",open:"남은 할 일",both:"할 일"})[mode]}`;
+  return {head,sections,count:sections.reduce((n,s)=>n+s[1].length,0)};
+}
+function tqSpeech(r){
+  const parts=[`${r.head}입니다.`];
+  for(const [title,list] of r.sections){
+    if(!list.length){ parts.push(`${title}은 없습니다.`); continue; }
+    parts.push(`${title} ${list.length}개.`);
+    list.slice(0,5).forEach((x,i)=>parts.push(`${i+1}번, ${x.it.text}.`));
+    if(list.length>5) parts.push(`외 ${list.length-5}개가 더 있습니다.`);
+  }
+  return parts.join(" ");
+}
+
+let tqLast="";
+function openTodoQuerySheet(v,speakIt){
+  tqLast=v;
+  const r=tqCollect(v);
+  const row=x=>`<label class="ck ${x.it.doneAt?"done":""}"><input type="checkbox" data-tqitem="${x.t.id}|${x.it.id}" ${x.it.doneAt?"checked":""}>
+    <span>${esc(x.it.text)}<br><span class="d">${esc(x.t.title)}${x.it.doneAt?` · 끝낸 날 ${fmt(x.it.doneAt)}`:""}${x.it.due&&x.it.due.iso?` · 기한 ${fmt(+new Date(x.it.due.iso),false)}`:""}${(x.it.memo||"").trim()?" · 메모":""}</span></span></label>`;
+  openSheet(`<p class="say">${esc(r.head)} <span class="d">${r.count}건</span></p>
+    ${r.sections.map(([title,list])=>`<div class="sec">${esc(title)} ${list.length}</div>${list.length?list.slice(0,50).map(row).join(""):`<p class="d">없습니다.</p>`}`).join("")}
+    <p class="raw">"지난주 끝낸 할 일", "밀린 할 일 보여줘"처럼 물어볼 수 있습니다.</p>
+    <div class="acts"><button class="btn" id="tqSpeak">읽어주기</button><button class="btn primary" data-close="1">닫기</button></div>`);
+  $("tqSpeak").onclick=()=>speakText(tqSpeech(r));
+  $("sheet").querySelectorAll("[data-tqitem]").forEach(c=>c.addEventListener("change",async()=>{
+    await toggleItem(c.dataset.tqitem,c.checked); openTodoQuerySheet(tqLast,false);
+  }));
+  if(speakIt) speakText(tqSpeech(r));
+}
+
+/* ---------- 읽어주기 (iOS 안정화) ---------- */
+let ttsQueue=[], ttsVoice=null;
+function pickVoice(){ const vs=speechSynthesis.getVoices()||[]; ttsVoice=vs.find(v=>/ko[-_]KR/i.test(v.lang))||vs.find(v=>/^ko/i.test(v.lang))||null; }
+if("speechSynthesis" in window){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
+function stopSpeak(){ ttsQueue=[]; try{ speechSynthesis.cancel(); }catch{} speaking=false; $("speak").classList.remove("speaking"); const bp=$("briefPlay"); if(bp){ bp.querySelector(".bp-ico").textContent="▶"; bp.querySelector("b").textContent="오늘 브리핑 듣기"; } }
+function speakNext(){
+  if(!ttsQueue.length){ speaking=false; $("speak").classList.remove("speaking"); if(tab==="home") render(); return; }
+  const u=new SpeechSynthesisUtterance(ttsQueue.shift());
+  u.lang="ko-KR"; u.rate=1.0; u.volume=1; if(ttsVoice) u.voice=ttsVoice;
+  u.onend=()=>speakNext();
+  u.onerror=ev=>{ if(ev&&ev.error==="not-allowed") toast("소리를 내려면 화면을 한 번 눌러 주세요."); speakNext(); };
+  speechSynthesis.speak(u);
+}
+let ttsUnlocked=false;
+function unlockTTS(){
+  if(ttsUnlocked||!("speechSynthesis" in window)) return;
+  try{ const u=new SpeechSynthesisUtterance(" "); u.volume=0; u.lang="ko-KR"; speechSynthesis.speak(u); ttsUnlocked=true; }catch{}
+}
+["touchend","click","keydown"].forEach(ev=>document.addEventListener(ev,unlockTTS,{capture:true,passive:true}));
+function speakText(text){
+  if(!("speechSynthesis" in window)){ toast("이 기기에서는 읽어주기를 쓸 수 없습니다."); return; }
+  stopSpeak();
+  ttsQueue=String(text).split(/(?<=[.!?。])\s+/).map(x=>x.trim()).filter(Boolean);
+  speaking=true; $("speak").classList.add("speaking");
+  setTimeout(()=>{ try{ speechSynthesis.resume(); }catch{} speakNext(); },120);
+  toast("읽는 중입니다. 소리가 안 나면 아이폰의 무음 스위치를 확인하세요.");
+}
+function speakBrief_new(){
+  if(speaking){ stopSpeak(); return; }
+  speakText(briefText());
+}
 function speakBrief(){
+  return speakBrief_new();
   if(!("speechSynthesis" in window)){ toast("이 기기에서는 읽어주기를 쓸 수 없습니다."); return; }
   if(speaking){ speechSynthesis.cancel(); speaking=false; $("speak").classList.remove("speaking"); return; }
   const u=new SpeechSynthesisUtterance(briefText());
@@ -2182,26 +2316,43 @@ function renderTodoSheet(){
 
 function submit(){
   const v=omni.value.trim(); if(!v) return;
-  if(BRIEF_RE.test(v)){ omni.value=""; omni.style.height="auto"; tab="home"; render(); speakBrief(); toast("브리핑을 읽습니다. 다시 누르면 멈춥니다."); return; }
+  const cmd=routeCommand(v);
+  if(BRIEF_RE.test(v)||(cmd&&cmd.type==="brief")){ omni.value=""; omni.style.height="auto"; window.__fromVoice=false; tab="home"; render(); stopSpeak(); speakText(briefText()); return; }
+  if(cmd&&cmd.type==="todo"){ omni.value=""; omni.style.height="auto"; openTodoQuerySheet(v,!!window.__fromVoice); window.__fromVoice=false; return; }
   const q=v.replace(/[?？]/g,"").trim();
   if((/[?？]$/.test(v)||(q.length<=10&&!/\s/.test(q)))&&tasks.some(t=>t.title.includes(q))){
     filter=q; tab="list"; omni.value=""; omni.style.height="auto"; render(); return;
   }
+  if(isTodoQuery(v)){ omni.value=""; omni.style.height="auto"; openTodoQuerySheet(v,!!window.__fromVoice); window.__fromVoice=false; return; }
   if(TODO_RE.test(v)){ openTodoSheet(v); return; }
   buildPending(v);
 }
-$("speak").onclick=()=>{ speakBrief(); if(speaking) toast("브리핑을 읽습니다. 다시 누르면 멈춥니다."); };
+$("speak").onclick=()=>{ if(speaking){ stopSpeak(); return; } speakText(briefText()); };
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 let rec=null,recOn=false;
+const standalone=!!(navigator.standalone||matchMedia("(display-mode: standalone)").matches);
+function micFallback(msg){
+  omni.focus();
+  openSheet(`<p class="say">말로 적기</p>
+    <p class="raw" style="margin-top:0">${msg}</p>
+    <p class="raw">대신 <b>키보드의 마이크 단추</b>(받아쓰기)를 눌러 말하면 입력창에 글자로 들어갑니다. 그다음 [기록]을 누르세요.</p>
+    <p class="raw">"오늘 브리핑", "지난 할 일 불러줘"처럼 말하면 그 명령을 바로 실행합니다.</p>
+    <div class="acts"><button class="btn primary" data-close="1">알겠습니다</button></div>`);
+}
 $("mic").onclick=()=>{
-  if(!SR){ toast("이 기기에서는 말로 적기를 쓸 수 없습니다."); return; }
+  if(!SR){ micFallback(standalone?"아이폰은 홈 화면에 추가한 앱에서 음성 인식을 막아 둡니다.":"이 기기·브라우저에서는 음성 인식을 지원하지 않습니다."); return; }
   if(recOn){ rec.stop(); return; }
   rec=new SR(); rec.lang="ko-KR"; rec.interimResults=true; rec.continuous=false;
   const base=omni.value?omni.value.replace(/\s*$/,"")+" ":"";
   rec.onstart=()=>{ recOn=true; $("mic").classList.add("on"); };
   rec.onresult=e=>{ let t=""; for(const r of e.results) t+=r[0].transcript; omni.value=base+t; };
-  rec.onerror=()=>toast("말로 적기에 실패했습니다.");
-  rec.onend=()=>{ recOn=false; $("mic").classList.remove("on"); if(omni.value.trim()) toast("확인하고 [기록]을 누르세요."); };
+  rec.onerror=ev=>{ const er=ev&&ev.error;
+    if(er==="not-allowed"||er==="service-not-allowed") micFallback(standalone?"아이폰은 홈 화면에 추가한 앱에서 음성 인식을 막아 둡니다.":"마이크 사용이 허용되지 않았습니다. 설정 > Safari > 마이크 를 확인하세요.");
+    else if(er!=="no-speech"&&er!=="aborted") toast("말로 적기에 실패했습니다."); };
+  rec.onend=()=>{ recOn=false; $("mic").classList.remove("on");
+    const v=omni.value.trim(); if(!v) return;
+    if(BRIEF_RE.test(v)||isTodoQuery(v)||routeCommand(v)){ window.__fromVoice=true; submit(); return; }
+    toast("확인하고 [기록]을 누르세요."); };
   try{ rec.start(); }catch{ toast("말로 적기를 시작하지 못했습니다."); }
 };
 document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{ tab=b.dataset.tab; render(); });
